@@ -1,5 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { Navbar } from '@/components/layout/navbar'
+import { PageWrapper } from '@/components/layout/page-wrapper'
+import { PageHeader } from '@/components/layout/page-header'
+import { Card, CardContent } from '@/components/ui/card'
+import { Avatar } from '@/components/ui/avatar'
+import { RoleBadge } from '@/components/ui/badge'
 import { signOut } from './actions'
 
 export default async function HomePage() {
@@ -12,23 +18,45 @@ export default async function HomePage() {
     redirect('/login')
   }
 
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-md">
-        <h1 className="mb-2 text-xl font-bold text-gray-900">
-          歡迎，{user.user_metadata.full_name ?? user.email}
-        </h1>
-        <p className="mb-6 text-sm text-gray-500">{user.email}</p>
+  const { data: profile } = await supabase
+    .from('users')
+    .select('name, role')
+    .eq('id', user.id)
+    .single()
 
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600"
-          >
-            登出
-          </button>
-        </form>
-      </div>
-    </main>
+  const navUser = {
+    name:      profile?.name ?? user.user_metadata.full_name ?? user.email ?? '使用者',
+    email:     user.email ?? '',
+    role:      profile?.role ?? 'student',
+    avatarUrl: user.user_metadata.avatar_url ?? null,
+  }
+
+  return (
+    <>
+      <Navbar user={navUser} signOutAction={signOut} />
+      <PageWrapper>
+        <PageHeader
+          title={`歡迎，${navUser.name}`}
+          subtitle="GEAI1017 學習平台"
+        />
+
+        <Card className="max-w-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <Avatar
+                src={navUser.avatarUrl}
+                name={navUser.name}
+                size="lg"
+              />
+              <div>
+                <p className="font-semibold text-foreground">{navUser.name}</p>
+                <p className="text-sm text-foreground/60 mb-1">{navUser.email}</p>
+                <RoleBadge role={navUser.role} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    </>
   )
 }
