@@ -18,7 +18,7 @@ vi.mock('next/headers', () => ({
 }))
 
 // Import AFTER mocks are set up
-const { middleware } = await import('../middleware')
+const { proxy } = await import('../proxy')
 
 function makeRequest(path: string): NextRequest {
   return new NextRequest(new URL(`http://localhost:3000${path}`))
@@ -31,7 +31,7 @@ describe('middleware', () => {
 
   it('redirects unauthenticated user from / to /login', async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null })
-    const response = await middleware(makeRequest('/'))
+    const response = await proxy(makeRequest('/'))
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('/login')
   })
@@ -41,7 +41,7 @@ describe('middleware', () => {
       data: { user: { id: 'user-123', email: 'test@gmail.com' } },
       error: null,
     })
-    const response = await middleware(makeRequest('/login'))
+    const response = await proxy(makeRequest('/login'))
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('/')
     expect(response.headers.get('location')).not.toContain('/login')
@@ -52,7 +52,7 @@ describe('middleware', () => {
       data: { user: { id: 'user-123', email: 'test@gmail.com' } },
       error: null,
     })
-    const response = await middleware(makeRequest('/dashboard'))
+    const response = await proxy(makeRequest('/dashboard'))
     expect(response.status).toBe(200)
   })
 })
