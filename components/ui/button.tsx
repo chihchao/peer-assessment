@@ -34,16 +34,30 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   isLoading?: boolean
+  asChild?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, isLoading, children, disabled, ...props }, ref) => {
+  ({ className, variant, size, isLoading, children, disabled, asChild, ...props }, ref) => {
+    const computedClass = buttonVariants({ variant, size, className })
+
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement<React.HTMLAttributes<HTMLElement>>, {
+        className: [
+          computedClass,
+          (children as React.ReactElement<React.HTMLAttributes<HTMLElement>>).props.className,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      })
+    }
+
     return (
       <button
         ref={ref}
         disabled={disabled || isLoading}
         aria-disabled={disabled || isLoading}
-        className={buttonVariants({ variant, size, className })}
+        className={computedClass}
         {...props}
       >
         {isLoading && (
