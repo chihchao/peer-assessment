@@ -27,7 +27,7 @@ export async function submitAssignment(assignmentId: string, formData: FormData)
     return { error: '此作業目前不接受繳交' }
   }
 
-  // Check no existing submission
+  // Check for existing submission (upsert path)
   const { data: existing } = await supabase
     .from('submissions')
     .select('id')
@@ -35,10 +35,8 @@ export async function submitAssignment(assignmentId: string, formData: FormData)
     .eq('student_id', user.id)
     .single()
 
-  if (existing) return { error: '您已繳交此作業' }
-
   // Collect field values from formData
-  // Format: field_<field_id>_value or extra_<index>_label / extra_<index>_value
+  // Format: field_<index>_id / field_<index>_label / field_<index>_value or extra_<index>_label / extra_<index>_value
   const fieldValues: FieldValue[] = []
 
   // Teacher-defined fields
@@ -62,6 +60,24 @@ export async function submitAssignment(assignmentId: string, formData: FormData)
     j++
   }
 
+  if (existing) {
+    // Replace all field values for the existing submission
+    await supabase.from('submission_field_values').delete().eq('submission_id', existing.id)
+    if (fieldValues.length > 0) {
+      await supabase.from('submission_field_values').insert(
+        fieldValues.map(fv => ({ submission_id: existing.id, ...fv }))
+      )
+    }
+    await supabase
+      .from('submissions')
+      .update({ submitted_at: new Date().toISOString() })
+      .eq('id', existing.id)
+
+    revalidatePath(`/assignments`)
+    revalidatePath(`/courses`)
+    return { success: true }
+  }
+
   const { data: submission, error: subErr } = await supabase
     .from('submissions')
     .insert({ assignment_id: assignmentId, student_id: user.id })
@@ -77,6 +93,7 @@ export async function submitAssignment(assignmentId: string, formData: FormData)
   }
 
   revalidatePath(`/assignments`)
+  revalidatePath(`/courses`)
   return { success: true }
 }
 

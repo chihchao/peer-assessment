@@ -19,7 +19,7 @@ interface NavItem {
 
 const NAV_ITEMS: Record<string, NavItem[]> = {
   student: [
-    { label: '我的作業', href: '/assignments' },
+    { label: '課程',     href: '/courses' },
     { label: '互評任務', href: '/peer-review' },
     { label: '成績查詢', href: '/grades' },
   ],

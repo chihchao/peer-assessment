@@ -139,32 +139,54 @@ export default async function AssignmentDetailPage({
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">
-                {mySubmission ? '您已繳交此作業' : '繳交作業'}
+                {mySubmission ? '修改繳交' : '繳交作業'}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {mySubmission ? (
-                <div className="space-y-3">
-                  {[...(mySubmission.submission_field_values ?? [])]
-                    .sort((a, b) => a.order - b.order)
-                    .map(fv => (
-                      <div key={fv.id}>
-                        <p className="text-xs font-medium text-foreground/60 mb-0.5">{fv.label}</p>
-                        <p className="text-sm whitespace-pre-wrap">{fv.value}</p>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <SubmissionForm assignmentId={aid} fields={sortedFields} />
-              )}
+              <SubmissionForm
+                assignmentId={aid}
+                fields={sortedFields}
+                initialValues={
+                  mySubmission
+                    ? [...(mySubmission.submission_field_values ?? [])]
+                        .sort((a, b) => a.order - b.order)
+                        .map(fv => ({
+                          label: fv.label,
+                          value: fv.value,
+                          fieldId: fv.field_id ?? undefined,
+                          order: fv.order,
+                        }))
+                    : undefined
+                }
+              />
             </CardContent>
           </Card>
         )}
 
         {isStudent && assignment.status !== 'open' && (
-          <p className="text-sm text-foreground/60">
-            {assignment.status === 'draft' ? '此作業尚未開放繳交。' : '繳交期間已結束。'}
-          </p>
+          <>
+            {mySubmission ? (
+              <Card>
+                <CardHeader><CardTitle className="text-sm">已繳交內容</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {[...(mySubmission.submission_field_values ?? [])]
+                      .sort((a, b) => a.order - b.order)
+                      .map(fv => (
+                        <div key={fv.id}>
+                          <p className="text-xs font-medium text-foreground/60 mb-0.5">{fv.label}</p>
+                          <p className="text-sm whitespace-pre-wrap">{fv.value}</p>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <p className="text-sm text-foreground/60">
+                {assignment.status === 'draft' ? '此作業尚未開放繳交。' : '繳交期間已結束。'}
+              </p>
+            )}
+          </>
         )}
       </PageWrapper>
     </>

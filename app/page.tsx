@@ -24,6 +24,10 @@ export default async function HomePage() {
     .eq('id', user.id)
     .single()
 
+  if (profile?.role === 'student') {
+    redirect('/courses')
+  }
+
   const navUser = {
     name:      profile?.name ?? user.user_metadata.full_name ?? user.email ?? '使用者',
     email:     user.email ?? '',

@@ -64,7 +64,7 @@ Re-exported from `components/layout/index.ts`.
 | Component | File | Type | Description |
 |-----------|------|------|-------------|
 | AssignmentForm | `assignment-form.tsx` | Client | Dynamic form for creating/editing assignments; manages field & dimension arrays; used by teacher create/edit pages |
-| SubmissionForm | `submission-form.tsx` | Client | Student submission form; renders teacher-defined fields; supports student-added extra single-line fields via "新增欄位" button |
+| SubmissionForm | `submission-form.tsx` | Client | Student submission form; textarea fields rendered first, single-line fields second; accepts optional `initialValues` prop for edit/pre-fill mode; "新增欄位" adds a value-only extra field (label auto-generated); submit button shows "更新繳交" when editing |
 | ReviewForm | `review-form.tsx` | Client | Peer review rating form; one numeric input per dimension; enforces scale bounds before submission |
 
 ### Hooks (`hooks/`)
@@ -74,7 +74,7 @@ Re-exported from `components/layout/index.ts`.
 ### Role-based Navigation (Navbar)
 
 ```
-student: 我的作業 (/assignments), 互評任務 (/peer-review), 成績查詢 (/grades)
+student: 課程 (/courses), 互評任務 (/peer-review), 成績查詢 (/grades)
 teacher: 課程管理 (/courses), 作業管理 (/assignments), 成績總覽 (/grades), 學生名單 (/students)
 ta:      互評管理 (/peer-review), 成績審核 (/grades), 學生名單 (/students)
 ```
@@ -116,7 +116,7 @@ Supabase MCP is configured in `.mcp.json`. Use `mcp__supabase__apply_migration` 
 |--------|------|-------|
 | `id` | `uuid` PK | FK → `auth.users.id` |
 | `email` | `text` | |
-| `name` | `text` | from `raw_user_meta_data.full_name` (Google) |
+| `name` | `text` | nullable; from `raw_user_meta_data.full_name` (Google) |
 | `role` | `text` | default `'student'`; valid values: `student`, `teacher`, `ta` |
 | `created_at` | `timestamptz` | default `now()` |
 
@@ -125,7 +125,7 @@ Supabase MCP is configured in `.mcp.json`. Use `mcp__supabase__apply_migration` 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | `uuid` PK | |
-| `teacher_id` | `uuid` | FK → `users.id` |
+| `teacher_id` | `uuid` | FK → `users.id` (cascade delete) |
 | `name` | `text` | |
 | `description` | `text` | nullable |
 | `created_at` | `timestamptz` | |
@@ -179,10 +179,10 @@ Supabase MCP is configured in `.mcp.json`. Use `mcp__supabase__apply_migration` 
 |--------|------|-------|
 | `id` | `uuid` PK | |
 | `submission_id` | `uuid` | FK → `submissions.id` (cascade) |
-| `field_id` | `uuid` | FK → `assignment_fields.id` (nullable — for student-added extra fields) |
+| `field_id` | `uuid` | FK → `assignment_fields.id` (nullable, ON DELETE SET NULL — for student-added extra fields) |
 | `label` | `text` | field label (copied at submission time) |
-| `value` | `text` | |
-| `order` | `int` | |
+| `value` | `text` | default `''` |
+| `order` | `int` | default `0` |
 
 **`peer_review_assignments`** — which student reviews which submission
 
@@ -190,9 +190,11 @@ Supabase MCP is configured in `.mcp.json`. Use `mcp__supabase__apply_migration` 
 |--------|------|-------|
 | `id` | `uuid` PK | |
 | `assignment_id` | `uuid` | FK → `assignments.id` (cascade) |
-| `reviewer_id` | `uuid` | FK → `users.id` |
-| `submission_id` | `uuid` | FK → `submissions.id` |
+| `reviewer_id` | `uuid` | FK → `users.id` (cascade) |
+| `submission_id` | `uuid` | FK → `submissions.id` (cascade) |
 | `completed_at` | `timestamptz` | null until review submitted |
+
+UNIQUE `(reviewer_id, submission_id)` — prevents duplicate reviewer assignments.
 
 **`reviews`** — one per `peer_review_assignment`
 
@@ -211,6 +213,8 @@ Supabase MCP is configured in `.mcp.json`. Use `mcp__supabase__apply_migration` 
 | `dimension_id` | `uuid` | FK → `review_dimensions.id` (cascade) |
 | `score` | `int` | |
 
+UNIQUE `(review_id, dimension_id)` — one score per dimension per review.
+
 **`grades`** — computed grade per student per assignment (upsert on recalculation)
 
 | Column | Type | Notes |
@@ -218,7 +222,7 @@ Supabase MCP is configured in `.mcp.json`. Use `mcp__supabase__apply_migration` 
 | `id` | `uuid` PK | |
 | `assignment_id` | `uuid` | FK → `assignments.id` (cascade) |
 | `student_id` | `uuid` | FK → `users.id` |
-| `score` | `numeric(6,2)` | trim-average result |
+| `score` | `numeric` | trim-average result |
 | `calculated_at` | `timestamptz` | |
 
 All tables have RLS enabled. RLS summary:
@@ -236,7 +240,7 @@ All tables have RLS enabled. RLS summary:
 | `app/actions.ts` | `signOut` |
 | `app/actions/courses.ts` | `createCourse`, `updateCourse`, `deleteCourse`, `getCourses`, `getCourse` |
 | `app/actions/assignments.ts` | `createAssignment`, `updateAssignment`, `deleteAssignment`, `publishAssignment`, `activatePeerReview`, `activateGradeCalculation`, `getAssignment`, `getCourseAssignments` |
-| `app/actions/submissions.ts` | `submitAssignment`, `submitReview`, `getMySubmission`, `getPendingReviews`, `getReviewDetail` |
+| `app/actions/submissions.ts` | `submitAssignment` (upsert — supports edit), `submitReview`, `getMySubmission`, `getPendingReviews`, `getReviewDetail` |
 
 ### Grade Calculation Algorithm (`activateGradeCalculation`)
 
@@ -255,16 +259,16 @@ Fisher-Yates shuffle of submissions, then each student reviews the next `reviewe
 | Route | File | Roles | Status |
 |-------|------|-------|--------|
 | `/login` | `app/login/page.tsx` | All | Complete |
-| `/` | `app/page.tsx` | All | Complete — home with user card |
+| `/` | `app/page.tsx` | Teacher, TA | Complete — students are redirected to `/courses`; teachers/TAs see welcome card |
 | `/auth/callback` | `app/auth/callback/route.ts` | — | Complete — OAuth callback |
-| `/courses` | `app/courses/page.tsx` | All | Complete — teacher: create button; others: read-only |
+| `/courses` | `app/courses/page.tsx` | All | Complete — student landing page after login; teacher: create button; others: read-only |
 | `/courses/new` | `app/courses/new/page.tsx` | Teacher | Complete |
 | `/courses/[id]` | `app/courses/[id]/page.tsx` | All | Complete — teacher: edit/delete/add-assignment |
 | `/courses/[id]/edit` | `app/courses/[id]/edit/page.tsx` | Teacher | Complete |
 | `/courses/[id]/assignments/new` | `app/courses/[id]/assignments/new/page.tsx` | Teacher | Complete |
-| `/courses/[id]/assignments/[aid]` | `app/courses/[id]/assignments/[aid]/page.tsx` | All | Complete — role-branched: teacher lifecycle buttons; student submit/view |
+| `/courses/[id]/assignments/[aid]` | `app/courses/[id]/assignments/[aid]/page.tsx` | All | Complete — teacher: lifecycle buttons; student: submit (blank fields allowed) or edit submission (pre-filled form, upsert); read-only view when not open |
 | `/courses/[id]/assignments/[aid]/edit` | `app/courses/[id]/assignments/[aid]/edit/page.tsx` | Teacher | Complete — blocked if status ≠ draft |
-| `/assignments` | `app/assignments/page.tsx` | All | Complete — lists open assignments |
+| `/assignments` | `app/assignments/page.tsx` | Teacher, TA | Complete — lists open assignments (removed from student navbar) |
 | `/peer-review` | `app/peer-review/page.tsx` | Student | Complete — pending review list |
 | `/peer-review/[rid]` | `app/peer-review/[rid]/page.tsx` | Student | Complete — side-by-side submission view + rating form |
 | `/grades` | `app/grades/page.tsx` | All | Complete — student: own grades; teacher/TA: full table |
@@ -279,6 +283,7 @@ Fisher-Yates shuffle of submissions, then each student reviews the next `reviewe
 
 Core academic workflow is complete. Potential future enhancements:
 
+- **Course enrollment**: a `course_enrollments` table so students only see courses/assignments they are enrolled in (currently all students see all courses)
 - **Notifications**: alert students when peer review is activated or grades are published
 - **TA write access**: allow TA to manage stuck workflows (currently read-only)
 - **Assignment excusal**: teacher ability to mark a student as excused before activating peer review
