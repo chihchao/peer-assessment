@@ -56,10 +56,10 @@ export default async function AssignmentDetailPage({
   // Get student's own submission
   const mySubmission = isStudent ? await getMySubmission(aid) : null
 
-  const deleteAssignmentById = deleteAssignment.bind(null, aid)
-  const publishAssignmentById = publishAssignment.bind(null, aid)
-  const activatePeerReviewById = activatePeerReview.bind(null, aid)
-  const activateGradeCalculationById = activateGradeCalculation.bind(null, aid)
+  const deleteAssignmentById = deleteAssignment.bind(null, aid) as unknown as () => Promise<void>
+  const publishAssignmentById = publishAssignment.bind(null, aid) as unknown as () => Promise<void>
+  const activatePeerReviewById = activatePeerReview.bind(null, aid) as unknown as () => Promise<void>
+  const activateGradeCalculationById = activateGradeCalculation.bind(null, aid) as unknown as () => Promise<void>
 
   const sortedFields = [...(assignment.assignment_fields ?? [])].sort((a, b) => a.order - b.order)
   const sortedDimensions = [...(assignment.review_dimensions ?? [])].sort((a, b) => a.order - b.order)

@@ -18,11 +18,11 @@ const STATUS_LABELS: Record<string, string> = {
   graded: '已評分',
 }
 
-const STATUS_VARIANT: Record<string, 'default' | 'secondary'> = {
-  draft: 'secondary',
-  open: 'default',
-  reviewing: 'default',
-  graded: 'secondary',
+const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning'> = {
+  draft: 'default',
+  open: 'success',
+  reviewing: 'warning',
+  graded: 'default',
 }
 
 export default async function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +35,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const isOwner = navUser.role === 'teacher' && course.teacher_id === userId
   const assignments = await getCourseAssignments(id)
 
-  const deleteCourseById = deleteCourse.bind(null, id)
+  const deleteCourseById = deleteCourse.bind(null, id) as unknown as () => Promise<void>
 
   return (
     <>

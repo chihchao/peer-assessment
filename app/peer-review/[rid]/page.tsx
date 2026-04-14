@@ -17,9 +17,7 @@ export default async function PeerReviewDetailPage({ params }: { params: Promise
   const detail = await getReviewDetail(rid)
   if (!detail) notFound()
 
-  // @ts-expect-error supabase join
   const assignment = detail.assignments
-  // @ts-expect-error supabase join
   const submission = detail.submissions
   const fieldValues = [...(submission?.submission_field_values ?? [])].sort(
     (a: { order: number }, b: { order: number }) => a.order - b.order

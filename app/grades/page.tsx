@@ -39,7 +39,6 @@ export default async function GradesPage() {
                   <CardHeader className="py-4">
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        {/* @ts-expect-error supabase join */}
                         <p className="text-xs text-foreground/50">{a.courses?.name}</p>
                         <CardTitle className="text-sm font-medium">{a.title}</CardTitle>
                       </div>
@@ -47,7 +46,7 @@ export default async function GradesPage() {
                         {grade ? (
                           <span className="text-2xl font-bold text-primary">{grade.score}</span>
                         ) : (
-                          <Badge variant="secondary">
+                          <Badge variant="default">
                             {a.status === 'graded' ? '未評分' : '評分中'}
                           </Badge>
                         )}
@@ -99,7 +98,6 @@ export default async function GradesPage() {
               return (
                 <Card key={a.id}>
                   <CardHeader>
-                    {/* @ts-expect-error supabase join */}
                     <p className="text-xs text-foreground/50">{a.courses?.name}</p>
                     <CardTitle className="text-sm">{a.title}</CardTitle>
                   </CardHeader>
@@ -118,9 +116,7 @@ export default async function GradesPage() {
                         <tbody>
                           {aGrades.map(g => (
                             <tr key={g.id} className="border-b border-border/50 last:border-0">
-                              {/* @ts-expect-error supabase join */}
                               <td className="py-1.5">{g.users?.name ?? '—'}</td>
-                              {/* @ts-expect-error supabase join */}
                               <td className="py-1.5 text-foreground/60">{g.users?.email ?? '—'}</td>
                               <td className="py-1.5 text-right font-semibold">{g.score}</td>
                             </tr>

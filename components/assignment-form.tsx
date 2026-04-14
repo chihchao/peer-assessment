@@ -14,7 +14,7 @@ interface DimensionDef {
 }
 
 interface AssignmentFormProps {
-  action: (formData: FormData) => Promise<void | { error?: string }>
+  action: (formData: FormData) => Promise<void | { error?: string } | { success?: boolean }>
   cancelHref: string
   defaultValues?: {
     title?: string

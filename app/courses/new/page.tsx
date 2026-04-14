@@ -21,7 +21,7 @@ export default async function NewCoursePage() {
         <PageHeader title="新增課程" />
         <Card className="max-w-lg">
           <CardContent className="pt-6">
-            <form action={createCourse} className="space-y-4">
+            <form action={createCourse as unknown as (formData: FormData) => Promise<void>} className="space-y-4">
               <Input
                 name="name"
                 label="課程名稱"

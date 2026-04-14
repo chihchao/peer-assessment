@@ -28,11 +28,9 @@ export default async function PeerReviewPage() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <CardTitle className="text-sm font-medium">
-                        {/* @ts-expect-error supabase join */}
                         {r.assignments?.title ?? '作業'}
                       </CardTitle>
                       <p className="text-xs text-foreground/50 mt-0.5">
-                        {/* @ts-expect-error supabase join */}
                         量表：{r.assignments?.scale_min} – {r.assignments?.scale_max}
                       </p>
                     </div>

@@ -133,8 +133,7 @@ export async function updateAssignment(id: string, formData: FormData) {
     .single()
 
   if (!assignment) return { error: '找不到作業' }
-  // @ts-expect-error supabase join type
-  if (assignment.courses.teacher_id !== user.id) return { error: '未授權' }
+  if ((assignment.courses as { teacher_id: string }).teacher_id !== user.id) return { error: '未授權' }
   if (assignment.status !== 'draft') return { error: '只能編輯草稿狀態的作業' }
 
   const parsed = parseAssignmentForm(formData)
@@ -176,8 +175,7 @@ export async function deleteAssignment(id: string) {
     .single()
 
   if (!assignment) return { error: '找不到作業' }
-  // @ts-expect-error supabase join type
-  if (assignment.courses.teacher_id !== user.id) return { error: '未授權' }
+  if ((assignment.courses as { teacher_id: string }).teacher_id !== user.id) return { error: '未授權' }
 
   await supabase.from('assignments').delete().eq('id', id)
 
@@ -197,8 +195,7 @@ export async function publishAssignment(id: string) {
     .single()
 
   if (!assignment) return { error: '找不到作業' }
-  // @ts-expect-error supabase join type
-  if (assignment.courses.teacher_id !== user.id) return { error: '未授權' }
+  if ((assignment.courses as { teacher_id: string }).teacher_id !== user.id) return { error: '未授權' }
   if (assignment.status !== 'draft') return { error: '只能發佈草稿狀態的作業' }
 
   const { error } = await supabase
@@ -224,8 +221,7 @@ export async function activatePeerReview(id: string) {
     .single()
 
   if (!assignment) return { error: '找不到作業' }
-  // @ts-expect-error supabase join type
-  if (assignment.courses.teacher_id !== user.id) return { error: '未授權' }
+  if ((assignment.courses as { teacher_id: string }).teacher_id !== user.id) return { error: '未授權' }
   if (assignment.status !== 'open') return { error: '只能對開放中的作業啟動互評' }
 
   // Get all students who have not yet submitted
@@ -303,8 +299,7 @@ export async function activateGradeCalculation(id: string) {
     .single()
 
   if (!assignment) return { error: '找不到作業' }
-  // @ts-expect-error supabase join type
-  if (assignment.courses.teacher_id !== user.id) return { error: '未授權' }
+  if ((assignment.courses as { teacher_id: string }).teacher_id !== user.id) return { error: '未授權' }
   if (assignment.status !== 'reviewing') return { error: '只能對互評中的作業計算成績' }
 
   // Check all reviews are complete

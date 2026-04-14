@@ -17,7 +17,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
   if (!course) notFound()
   if (navUser.role !== 'teacher' || course.teacher_id !== userId) redirect(`/courses/${id}`)
 
-  const updateCourseById = updateCourse.bind(null, id)
+  const updateCourseById = updateCourse.bind(null, id) as unknown as (formData: FormData) => Promise<void>
 
   return (
     <>

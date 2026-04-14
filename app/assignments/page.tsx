@@ -32,7 +32,6 @@ export default async function AssignmentsPage() {
                 <Card className="hover:border-primary transition-colors cursor-pointer">
                   <CardHeader className="py-4">
                     <div className="flex flex-col gap-1">
-                      {/* @ts-expect-error supabase join */}
                       <p className="text-xs text-foreground/50">{a.courses?.name}</p>
                       <CardTitle className="text-sm font-medium">{a.title}</CardTitle>
                       {a.description && (
