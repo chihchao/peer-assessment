@@ -15,6 +15,8 @@ export default async function GradesPage() {
   const isStudent = navUser.role === 'student'
 
   if (isStudent) {
+    const { data: { user } } = await supabase.auth.getUser()
+
     // Student: own grades
     const { data: grades } = await supabase
       .from('grades')
@@ -28,15 +30,83 @@ export default async function GradesPage() {
       .in('status', ['open', 'reviewing', 'graded'])
       .order('created_at', { ascending: false })
 
-    // Fetch my received review details for each graded assignment
+    // Fetch received review details for graded assignments using the page's own supabase client
     const gradedAssignmentIds = (assignments ?? []).filter(a => a.status === 'graded').map(a => a.id)
     const receivedReviewsMap = new Map<string, ReceivedReview[]>()
-    if (gradedAssignmentIds.length > 0) {
-      const results = await Promise.all(
-        gradedAssignmentIds.map(aid => getMyReceivedReviews(aid).then(r => ({ aid, r })))
-      )
-      for (const { aid, r } of results) {
-        receivedReviewsMap.set(aid, r)
+
+    if (gradedAssignmentIds.length > 0 && user) {
+      // My submissions for graded assignments
+      const { data: mySubmissions } = await supabase
+        .from('submissions')
+        .select('id, assignment_id')
+        .eq('student_id', user.id)
+        .in('assignment_id', gradedAssignmentIds)
+
+      const mySubMap = new Map((mySubmissions ?? []).map(s => [s.assignment_id, s.id]))
+      const mySubIds = (mySubmissions ?? []).map(s => s.id)
+
+      if (mySubIds.length > 0) {
+        // Completed peer_review_assignments for my submissions
+        const { data: pras } = await supabase
+          .from('peer_review_assignments')
+          .select('id, submission_id')
+          .in('submission_id', mySubIds)
+          .not('completed_at', 'is', null)
+
+        const praIds = (pras ?? []).map(p => p.id)
+
+        if (praIds.length > 0) {
+          // Reviews for those pras
+          const { data: reviews } = await supabase
+            .from('reviews')
+            .select('id, peer_review_assignment_id')
+            .in('peer_review_assignment_id', praIds)
+
+          const reviewIds = (reviews ?? []).map(r => r.id)
+
+          if (reviewIds.length > 0) {
+            // Scores + dimension labels
+            const { data: scores } = await supabase
+              .from('review_scores')
+              .select('review_id, score, review_dimensions(id, label)')
+              .in('review_id', reviewIds)
+
+            // Group by submission_id via pra lookup
+            const praSubMap = new Map((pras ?? []).map(p => [p.id, p.submission_id]))
+
+            // submission_id → assignment_id
+            const subAssignMap = new Map((mySubmissions ?? []).map(s => [s.id, s.assignment_id]))
+
+            // Build receivedReviewsMap: assignment_id → ReceivedReview[]
+            const tempMap = new Map<string, ReceivedReview[]>()
+            ;(reviews ?? []).forEach((review, idx) => {
+              const subId = praSubMap.get(review.peer_review_assignment_id)
+              if (!subId) return
+              const assignId = subAssignMap.get(subId)
+              if (!assignId) return
+
+              const reviewScores = (scores ?? []).filter(s => s.review_id === review.id)
+              const average = reviewScores.length > 0
+                ? reviewScores.reduce((sum, s) => sum + s.score, 0) / reviewScores.length
+                : 0
+
+              const list = tempMap.get(assignId) ?? []
+              list.push({
+                reviewIndex: list.length + 1,
+                scores: reviewScores.map(s => ({
+                  dimensionLabel: (s.review_dimensions as { label: string } | null)?.label ?? '',
+                  score: s.score,
+                })),
+                average,
+              })
+              tempMap.set(assignId, list)
+            })
+
+            for (const [aid, reviews] of tempMap) {
+              receivedReviewsMap.set(aid, reviews)
+            }
+          }
+        }
       }
     }
 
