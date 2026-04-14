@@ -134,7 +134,6 @@ export async function updateAssignment(id: string, formData: FormData) {
 
   if (!assignment) return { error: '找不到作業' }
   if ((assignment.courses as { teacher_id: string }).teacher_id !== user.id) return { error: '未授權' }
-  if (assignment.status !== 'draft') return { error: '只能編輯草稿狀態的作業' }
 
   const parsed = parseAssignmentForm(formData)
   if ('error' in parsed) return parsed

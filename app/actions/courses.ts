@@ -46,7 +46,7 @@ export async function updateCourse(id: string, formData: FormData) {
 
   revalidatePath(`/courses/${id}`)
   revalidatePath('/courses')
-  return { success: true }
+  redirect(`/courses/${id}`)
 }
 
 export async function deleteCourse(id: string) {

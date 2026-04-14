@@ -24,7 +24,6 @@ export default async function EditAssignmentPage({
 
   if (!course || !assignment || assignment.course_id !== id) notFound()
   if (navUser.role !== 'teacher' || course.teacher_id !== userId) redirect(`/courses/${id}/assignments/${aid}`)
-  if (assignment.status !== 'draft') redirect(`/courses/${id}/assignments/${aid}`)
 
   const updateAssignmentById = updateAssignment.bind(null, aid)
 
@@ -40,6 +39,7 @@ export default async function EditAssignmentPage({
           <CardContent className="pt-6">
             <AssignmentForm
               action={updateAssignmentById}
+              successHref={`/courses/${id}/assignments/${aid}`}
               cancelHref={`/courses/${id}/assignments/${aid}`}
               defaultValues={{
                 title: assignment.title,

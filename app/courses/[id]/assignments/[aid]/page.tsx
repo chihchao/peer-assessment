@@ -74,11 +74,11 @@ export default async function AssignmentDetailPage({
           actions={
             isOwner ? (
               <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" asChild>
+                  <Link href={`/courses/${id}/assignments/${aid}/edit`}>編輯</Link>
+                </Button>
                 {assignment.status === 'draft' && (
                   <>
-                    <Button variant="outline" asChild>
-                      <Link href={`/courses/${id}/assignments/${aid}/edit`}>編輯</Link>
-                    </Button>
                     <form action={publishAssignmentById}>
                       <Button type="submit">發佈作業</Button>
                     </form>

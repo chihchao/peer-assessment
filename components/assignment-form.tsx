@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -15,6 +16,7 @@ interface DimensionDef {
 
 interface AssignmentFormProps {
   action: (formData: FormData) => Promise<void | { error?: string } | { success?: boolean }>
+  successHref?: string
   cancelHref: string
   defaultValues?: {
     title?: string
@@ -29,7 +31,8 @@ interface AssignmentFormProps {
   disabled?: boolean
 }
 
-export function AssignmentForm({ action, cancelHref, defaultValues, disabled }: AssignmentFormProps) {
+export function AssignmentForm({ action, successHref, cancelHref, defaultValues, disabled }: AssignmentFormProps) {
+  const router = useRouter()
   const [fields, setFields] = useState<FieldDef[]>(
     defaultValues?.fields ?? [
       { label: '標題 / 作品名稱', field_type: 'single' },
@@ -79,6 +82,8 @@ export function AssignmentForm({ action, cancelHref, defaultValues, disabled }: 
     const result = await action(formData)
     if (result && 'error' in result && result.error) {
       setError(result.error)
+    } else if (successHref) {
+      router.push(successHref)
     }
   }
 
