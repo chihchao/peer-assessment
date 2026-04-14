@@ -223,6 +223,81 @@ export async function getReviewDetail(peerReviewAssignmentId: string) {
   return pra
 }
 
+export interface DimensionScore {
+  dimensionId: string
+  dimensionLabel: string
+  score: number
+}
+
+export interface ReviewDetail {
+  reviewerId: string
+  reviewerName: string | null
+  scores: DimensionScore[]
+  average: number
+}
+
+export interface SubmissionReviewDetail {
+  submissionId: string
+  studentId: string
+  reviews: ReviewDetail[]
+}
+
+export async function getAssignmentDetailedScores(assignmentId: string): Promise<SubmissionReviewDetail[]> {
+  const supabase = await createClient()
+
+  const { data: pras } = await supabase
+    .from('peer_review_assignments')
+    .select(`
+      submission_id,
+      reviewer_id,
+      users!reviewer_id(name),
+      reviews(
+        review_scores(
+          score,
+          dimension_id,
+          review_dimensions(id, label)
+        )
+      )
+    `)
+    .eq('assignment_id', assignmentId)
+    .not('completed_at', 'is', null)
+
+  if (!pras) return []
+
+  const map = new Map<string, SubmissionReviewDetail>()
+
+  for (const pra of pras) {
+    if (!map.has(pra.submission_id)) {
+      map.set(pra.submission_id, { submissionId: pra.submission_id, studentId: '', reviews: [] })
+    }
+    const entry = map.get(pra.submission_id)!
+
+    const review = Array.isArray(pra.reviews) ? pra.reviews[0] : pra.reviews
+    if (!review) continue
+
+    const scoreRows = (review as { review_scores: { score: number; dimension_id: string; review_dimensions: { id: string; label: string } | null }[] }).review_scores ?? []
+    const scores: DimensionScore[] = scoreRows
+      .filter(rs => rs.review_dimensions)
+      .map(rs => ({
+        dimensionId: rs.dimension_id,
+        dimensionLabel: rs.review_dimensions!.label,
+        score: rs.score,
+      }))
+
+    const average = scores.length > 0 ? scores.reduce((s, d) => s + d.score, 0) / scores.length : 0
+    const reviewer = pra.users as { name: string | null } | null
+
+    entry.reviews.push({
+      reviewerId: pra.reviewer_id,
+      reviewerName: reviewer?.name ?? null,
+      scores,
+      average,
+    })
+  }
+
+  return Array.from(map.values())
+}
+
 export interface StudentSubmissionStatus {
   studentId: string
   name: string | null
