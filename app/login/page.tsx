@@ -1,8 +1,25 @@
+'use client'
+
+import { useState } from 'react'
+import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { signInWithGoogle } from './actions'
 
 export default function LoginPage() {
+  const [loading, setLoading] = useState(false)
+
+  async function handleGoogleLogin() {
+    setLoading(true)
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    // signInWithOAuth redirects the browser automatically
+  }
+
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
@@ -11,12 +28,14 @@ export default function LoginPage() {
           <CardDescription className="mt-1">使用 Google 帳號登入</CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={signInWithGoogle}>
-            <Button type="submit" className="w-full gap-3">
-              <GoogleIcon />
-              使用 Google 帳號登入
-            </Button>
-          </form>
+          <Button
+            onClick={handleGoogleLogin}
+            isLoading={loading}
+            className="w-full gap-3"
+          >
+            {!loading && <GoogleIcon />}
+            使用 Google 帳號登入
+          </Button>
         </CardContent>
       </Card>
     </main>
