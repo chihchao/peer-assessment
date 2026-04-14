@@ -5,6 +5,7 @@ import { getCourse } from '@/app/actions/courses'
 import { getAssignment, deleteAssignment, publishAssignment, activatePeerReview, activateGradeCalculation } from '@/app/actions/assignments'
 import { getMySubmission, getAssignmentSubmissionStatus, getAssignmentPeerReviewStatus } from '@/app/actions/submissions'
 import type { StudentSubmissionStatus, ReviewerProgress } from '@/app/actions/submissions'
+import { createClient } from '@/utils/supabase/server'
 import { signOut } from '@/app/actions'
 import { Navbar } from '@/components/layout/navbar'
 import { PageWrapper } from '@/components/layout/page-wrapper'
@@ -14,6 +15,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SubmissionForm } from '@/components/submission-form'
 import { LinkifiedText } from '@/components/linkified-text'
+import { SubmissionStatusTable } from '@/components/submission-status-table'
+import type { SubmissionRow } from '@/components/submission-status-table'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',
@@ -44,12 +47,36 @@ export default async function AssignmentDetailPage({
   // Get submission/peer-review status for teacher view
   let submissionStatus: StudentSubmissionStatus[] = []
   let reviewStatus: ReviewerProgress[] = []
+  let submissionRows: SubmissionRow[] = []
   if (isOwner) {
+    const supabase = await createClient()
     const needsReviewStatus = assignment.status === 'reviewing' || assignment.status === 'graded'
     ;[submissionStatus, reviewStatus] = await Promise.all([
       getAssignmentSubmissionStatus(aid),
       needsReviewStatus ? getAssignmentPeerReviewStatus(aid) : Promise.resolve([]),
     ])
+
+    // Fetch submission IDs and field values for expand/detail features
+    const { data: subs } = await supabase
+      .from('submissions')
+      .select('id, student_id, submission_field_values(id, label, value, order, is_private)')
+      .eq('assignment_id', aid)
+
+    const subMap = new Map(
+      (subs ?? []).map(s => [
+        s.student_id,
+        {
+          submissionId: s.id,
+          fields: [...(s.submission_field_values ?? [])].sort((a, b) => a.order - b.order),
+        },
+      ])
+    )
+
+    submissionRows = submissionStatus.map(s => ({
+      ...s,
+      submissionId: subMap.get(s.studentId)?.submissionId,
+      fields: subMap.get(s.studentId)?.fields,
+    }))
   }
   const submissionCount = submissionStatus.filter(s => s.submittedAt !== null).length
   const totalStudents = submissionStatus.length
@@ -151,32 +178,15 @@ export default async function AssignmentDetailPage({
                       <th className="text-left px-4 py-2 font-medium">姓名</th>
                       <th className="text-left px-4 py-2 font-medium">Email</th>
                       <th className="text-left px-4 py-2 font-medium">繳交狀況</th>
+                      <th className="px-4 py-2" />
                     </tr>
                   </thead>
                   <tbody>
-                    {submissionStatus.map(s => (
-                      <tr key={s.studentId} className="border-b border-border last:border-0">
-                        <td className="px-4 py-2">{s.name ?? '—'}</td>
-                        <td className="px-4 py-2 text-foreground/60">{s.email}</td>
-                        <td className="px-4 py-2">
-                          {s.submittedAt ? (
-                            <span className="inline-flex items-center gap-1.5">
-                              <Badge className="bg-green-100 text-green-700 border-green-200">已繳交</Badge>
-                              <span className="text-xs text-foreground/50">
-                                {new Date(s.submittedAt).toLocaleString('zh-TW')}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-foreground/40">— 未繳交</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {submissionStatus.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-4 text-center text-foreground/40">尚無學生資料</td>
-                      </tr>
-                    )}
+                    <SubmissionStatusTable
+                      rows={submissionRows}
+                      courseId={id}
+                      assignmentId={aid}
+                    />
                   </tbody>
                 </table>
               </div>
