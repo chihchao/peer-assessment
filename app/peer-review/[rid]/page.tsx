@@ -7,6 +7,7 @@ import { PageWrapper } from '@/components/layout/page-wrapper'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ReviewForm } from '@/components/review-form'
+import { LinkifiedText } from '@/components/linkified-text'
 
 export default async function PeerReviewDetailPage({ params }: { params: Promise<{ rid: string }> }) {
   const { rid } = await params
@@ -43,7 +44,7 @@ export default async function PeerReviewDetailPage({ params }: { params: Promise
                 fieldValues.map((fv: { id: string; label: string; value: string }) => (
                   <div key={fv.id}>
                     <p className="text-xs font-medium text-foreground/60 mb-0.5">{fv.label}</p>
-                    <p className="text-sm whitespace-pre-wrap">{fv.value}</p>
+                    <LinkifiedText text={fv.value} className="text-sm" />
                   </div>
                 ))
               )}

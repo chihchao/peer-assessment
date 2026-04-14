@@ -188,7 +188,7 @@ export async function getPendingReviews() {
       assignment_id,
       submission_id,
       completed_at,
-      assignments(title, scale_min, scale_max)
+      assignments(title, scale_min, scale_max, courses(name))
     `)
     .eq('reviewer_id', user.id)
     .is('completed_at', null)
@@ -221,4 +221,69 @@ export async function getReviewDetail(peerReviewAssignmentId: string) {
   if (!pra || pra.reviewer_id !== user.id) return null
 
   return pra
+}
+
+export interface StudentSubmissionStatus {
+  studentId: string
+  name: string | null
+  email: string
+  submittedAt: string | null
+}
+
+export async function getAssignmentSubmissionStatus(assignmentId: string): Promise<StudentSubmissionStatus[]> {
+  const supabase = await createClient()
+
+  const [{ data: students }, { data: submissions }] = await Promise.all([
+    supabase.from('users').select('id, name, email').eq('role', 'student'),
+    supabase.from('submissions').select('student_id, submitted_at').eq('assignment_id', assignmentId),
+  ])
+
+  const submissionMap = new Map((submissions ?? []).map(s => [s.student_id, s.submitted_at]))
+
+  return (students ?? []).map(s => ({
+    studentId: s.id,
+    name: s.name,
+    email: s.email,
+    submittedAt: submissionMap.get(s.id) ?? null,
+  }))
+}
+
+export interface ReviewerProgress {
+  reviewerId: string
+  name: string | null
+  email: string
+  total: number
+  completed: number
+}
+
+export async function getAssignmentPeerReviewStatus(assignmentId: string): Promise<ReviewerProgress[]> {
+  const supabase = await createClient()
+
+  const { data: pras } = await supabase
+    .from('peer_review_assignments')
+    .select('reviewer_id, completed_at, users!reviewer_id(name, email)')
+    .eq('assignment_id', assignmentId)
+
+  if (!pras) return []
+
+  const map = new Map<string, ReviewerProgress>()
+  for (const pra of pras) {
+    const reviewer = pra.users as { name: string | null; email: string } | null
+    if (!reviewer) continue
+    const existing = map.get(pra.reviewer_id)
+    if (existing) {
+      existing.total++
+      if (pra.completed_at) existing.completed++
+    } else {
+      map.set(pra.reviewer_id, {
+        reviewerId: pra.reviewer_id,
+        name: reviewer.name,
+        email: reviewer.email,
+        total: 1,
+        completed: pra.completed_at ? 1 : 0,
+      })
+    }
+  }
+
+  return Array.from(map.values())
 }

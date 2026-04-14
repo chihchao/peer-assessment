@@ -27,6 +27,9 @@ export default async function PeerReviewPage() {
                 <CardHeader className="py-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
+                      <p className="text-xs text-foreground/50 mb-0.5">
+                        {(r.assignments as { courses?: { name: string } | null } | null)?.courses?.name ?? ''}
+                      </p>
                       <CardTitle className="text-sm font-medium">
                         {r.assignments?.title ?? '作業'}
                       </CardTitle>

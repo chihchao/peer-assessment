@@ -3,8 +3,8 @@ import { notFound } from 'next/navigation'
 import { requireAuth } from '@/utils/auth'
 import { getCourse } from '@/app/actions/courses'
 import { getAssignment, deleteAssignment, publishAssignment, activatePeerReview, activateGradeCalculation } from '@/app/actions/assignments'
-import { getMySubmission } from '@/app/actions/submissions'
-import { createClient } from '@/utils/supabase/server'
+import { getMySubmission, getAssignmentSubmissionStatus, getAssignmentPeerReviewStatus } from '@/app/actions/submissions'
+import type { StudentSubmissionStatus, ReviewerProgress } from '@/app/actions/submissions'
 import { signOut } from '@/app/actions'
 import { Navbar } from '@/components/layout/navbar'
 import { PageWrapper } from '@/components/layout/page-wrapper'
@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SubmissionForm } from '@/components/submission-form'
+import { LinkifiedText } from '@/components/linkified-text'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',
@@ -40,18 +41,18 @@ export default async function AssignmentDetailPage({
   const isOwner = isTeacher && course.teacher_id === userId
   const isStudent = navUser.role === 'student'
 
-  // Get submission count for teacher view
-  let submissionCount = 0
-  let totalStudents = 0
+  // Get submission/peer-review status for teacher view
+  let submissionStatus: StudentSubmissionStatus[] = []
+  let reviewStatus: ReviewerProgress[] = []
   if (isOwner) {
-    const supabase = await createClient()
-    const [{ count: sCount }, { count: tCount }] = await Promise.all([
-      supabase.from('submissions').select('id', { count: 'exact', head: true }).eq('assignment_id', aid),
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'student'),
+    const needsReviewStatus = assignment.status === 'reviewing' || assignment.status === 'graded'
+    ;[submissionStatus, reviewStatus] = await Promise.all([
+      getAssignmentSubmissionStatus(aid),
+      needsReviewStatus ? getAssignmentPeerReviewStatus(aid) : Promise.resolve([]),
     ])
-    submissionCount = sCount ?? 0
-    totalStudents = tCount ?? 0
   }
+  const submissionCount = submissionStatus.filter(s => s.submittedAt !== null).length
+  const totalStudents = submissionStatus.length
 
   // Get student's own submission
   const mySubmission = isStudent ? await getMySubmission(aid) : null
@@ -134,6 +135,103 @@ export default async function AssignmentDetailPage({
           </Card>
         </div>
 
+        {/* Teacher: submission status table */}
+        {isOwner && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-sm">
+                繳交狀況（已繳交 {submissionCount} / {totalStudents} 人）
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-foreground/60 text-xs">
+                      <th className="text-left px-4 py-2 font-medium">姓名</th>
+                      <th className="text-left px-4 py-2 font-medium">Email</th>
+                      <th className="text-left px-4 py-2 font-medium">繳交狀況</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {submissionStatus.map(s => (
+                      <tr key={s.studentId} className="border-b border-border last:border-0">
+                        <td className="px-4 py-2">{s.name ?? '—'}</td>
+                        <td className="px-4 py-2 text-foreground/60">{s.email}</td>
+                        <td className="px-4 py-2">
+                          {s.submittedAt ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <Badge className="bg-green-100 text-green-700 border-green-200">已繳交</Badge>
+                              <span className="text-xs text-foreground/50">
+                                {new Date(s.submittedAt).toLocaleString('zh-TW')}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-foreground/40">— 未繳交</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {submissionStatus.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-4 text-center text-foreground/40">尚無學生資料</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Teacher: peer review status table */}
+        {isOwner && (assignment.status === 'reviewing' || assignment.status === 'graded') && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-sm">
+                互評狀況（已完成 {reviewStatus.reduce((acc, r) => acc + r.completed, 0)} / {reviewStatus.reduce((acc, r) => acc + r.total, 0)} 件）
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-foreground/60 text-xs">
+                      <th className="text-left px-4 py-2 font-medium">互評者</th>
+                      <th className="text-left px-4 py-2 font-medium">Email</th>
+                      <th className="text-left px-4 py-2 font-medium">進度</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviewStatus.map(r => (
+                      <tr key={r.reviewerId} className="border-b border-border last:border-0">
+                        <td className="px-4 py-2">{r.name ?? '—'}</td>
+                        <td className="px-4 py-2 text-foreground/60">{r.email}</td>
+                        <td className="px-4 py-2">
+                          {r.completed === r.total ? (
+                            <Badge className="bg-green-100 text-green-700 border-green-200">
+                              全部完成（{r.total}）
+                            </Badge>
+                          ) : (
+                            <span className="text-foreground/60">
+                              {r.completed} / {r.total} 完成
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {reviewStatus.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-4 text-center text-foreground/40">尚無互評任務資料</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Student submission area */}
         {isStudent && assignment.status === 'open' && (
           <Card>
@@ -175,7 +273,7 @@ export default async function AssignmentDetailPage({
                       .map(fv => (
                         <div key={fv.id}>
                           <p className="text-xs font-medium text-foreground/60 mb-0.5">{fv.label}</p>
-                          <p className="text-sm whitespace-pre-wrap">{fv.value}</p>
+                          <LinkifiedText text={fv.value} className="text-sm" />
                         </div>
                       ))}
                   </div>
