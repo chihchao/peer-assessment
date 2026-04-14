@@ -1,7 +1,7 @@
 import { requireAuth } from '@/utils/auth'
 import { createClient } from '@/utils/supabase/server'
-import { getAssignmentDetailedScores } from '@/app/actions/submissions'
-import type { SubmissionReviewDetail } from '@/app/actions/submissions'
+import { getAssignmentDetailedScores, getMyReceivedReviews } from '@/app/actions/submissions'
+import type { SubmissionReviewDetail, ReceivedReview } from '@/app/actions/submissions' // SubmissionReviewDetail used in teacher section
 import { signOut } from '@/app/actions'
 import { Navbar } from '@/components/layout/navbar'
 import { PageWrapper } from '@/components/layout/page-wrapper'
@@ -15,8 +15,6 @@ export default async function GradesPage() {
   const isStudent = navUser.role === 'student'
 
   if (isStudent) {
-    const { data: { user } } = await supabase.auth.getUser()
-
     // Student: own grades
     const { data: grades } = await supabase
       .from('grades')
@@ -30,29 +28,16 @@ export default async function GradesPage() {
       .in('status', ['open', 'reviewing', 'graded'])
       .order('created_at', { ascending: false })
 
-    // Get my submissions to find my submission IDs for graded assignments
+    // Fetch my received review details for each graded assignment
     const gradedAssignmentIds = (assignments ?? []).filter(a => a.status === 'graded').map(a => a.id)
-    const { data: mySubmissions } = gradedAssignmentIds.length > 0 && user
-      ? await supabase.from('submissions').select('id, assignment_id').eq('student_id', user.id).in('assignment_id', gradedAssignmentIds)
-      : { data: [] }
-
-    // Fetch detailed scores for graded assignments (anonymised — reviewer names stripped at render)
-    const detailedScores = gradedAssignmentIds.length > 0
-      ? await Promise.all(gradedAssignmentIds.map(aid =>
-          getAssignmentDetailedScores(aid).then(d => ({ assignmentId: aid, details: d }))
-        ))
-      : []
-
-    // Build lookup: assignment_id → submission_id (mine)
-    const mySubmissionId = new Map((mySubmissions ?? []).map(s => [s.assignment_id, s.id]))
-
-    // Build lookup: assignment_id → my SubmissionReviewDetail
-    const myReviewDetail = new Map<string, SubmissionReviewDetail>()
-    for (const { assignmentId, details } of detailedScores) {
-      const sid = mySubmissionId.get(assignmentId)
-      if (!sid) continue
-      const found = details.find(d => d.submissionId === sid)
-      if (found) myReviewDetail.set(assignmentId, found)
+    const receivedReviewsMap = new Map<string, ReceivedReview[]>()
+    if (gradedAssignmentIds.length > 0) {
+      const results = await Promise.all(
+        gradedAssignmentIds.map(aid => getMyReceivedReviews(aid).then(r => ({ aid, r })))
+      )
+      for (const { aid, r } of results) {
+        receivedReviewsMap.set(aid, r)
+      }
     }
 
     return (
@@ -63,8 +48,8 @@ export default async function GradesPage() {
           <div className="grid gap-3">
             {(assignments ?? []).map(a => {
               const grade = (grades ?? []).find(g => g.assignment_id === a.id)
-              const reviewDetail = myReviewDetail.get(a.id)
-              const dimensions = reviewDetail?.reviews[0]?.scores.map(sc => sc.dimensionLabel) ?? []
+              const receivedReviews = receivedReviewsMap.get(a.id) ?? []
+              const dimensions = receivedReviews[0]?.scores.map(s => s.dimensionLabel) ?? []
               return (
                 <Card key={a.id}>
                   <CardHeader className="py-4">
@@ -85,7 +70,7 @@ export default async function GradesPage() {
                     </div>
                   </CardHeader>
                   {/* Peer review breakdown (graded only, reviewer names hidden) */}
-                  {grade && reviewDetail && reviewDetail.reviews.length > 0 && (
+                  {grade && receivedReviews.length > 0 && (
                     <CardContent className="pt-0">
                       <p className="text-xs font-medium text-foreground/50 mb-2">互評明細</p>
                       <div className="overflow-x-auto">
@@ -100,9 +85,9 @@ export default async function GradesPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {reviewDetail.reviews.map((r, ri) => (
-                              <tr key={ri} className="border-b border-border/40 last:border-0">
-                                <td className="py-1.5 text-foreground/50">評審 {ri + 1}</td>
+                            {receivedReviews.map(r => (
+                              <tr key={r.reviewIndex} className="border-b border-border/40 last:border-0">
+                                <td className="py-1.5 text-foreground/50">評審 {r.reviewIndex}</td>
                                 {dimensions.map(d => {
                                   const sc = r.scores.find(x => x.dimensionLabel === d)
                                   return (

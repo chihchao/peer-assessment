@@ -298,6 +298,70 @@ export async function getAssignmentDetailedScores(assignmentId: string): Promise
   return Array.from(map.values())
 }
 
+export interface ReceivedReview {
+  reviewIndex: number
+  scores: { dimensionLabel: string; score: number }[]
+  average: number
+}
+
+export async function getMyReceivedReviews(assignmentId: string): Promise<ReceivedReview[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  // My submission for this assignment
+  const { data: submission } = await supabase
+    .from('submissions')
+    .select('id')
+    .eq('assignment_id', assignmentId)
+    .eq('student_id', user.id)
+    .single()
+
+  if (!submission) return []
+
+  // Completed peer_review_assignments for my submission
+  const { data: pras } = await supabase
+    .from('peer_review_assignments')
+    .select('id')
+    .eq('submission_id', submission.id)
+    .not('completed_at', 'is', null)
+
+  if (!pras || pras.length === 0) return []
+
+  const praIds = pras.map(p => p.id)
+
+  // Reviews for those pras
+  const { data: reviews } = await supabase
+    .from('reviews')
+    .select('id, peer_review_assignment_id')
+    .in('peer_review_assignment_id', praIds)
+
+  if (!reviews || reviews.length === 0) return []
+
+  const reviewIds = reviews.map(r => r.id)
+
+  // Scores + dimension labels
+  const { data: scores } = await supabase
+    .from('review_scores')
+    .select('review_id, score, dimension_id, review_dimensions(id, label)')
+    .in('review_id', reviewIds)
+
+  return reviews.map((review, idx) => {
+    const reviewScores = (scores ?? []).filter(s => s.review_id === review.id)
+    const average = reviewScores.length > 0
+      ? reviewScores.reduce((sum, s) => sum + s.score, 0) / reviewScores.length
+      : 0
+    return {
+      reviewIndex: idx + 1,
+      scores: reviewScores.map(s => ({
+        dimensionLabel: (s.review_dimensions as { label: string } | null)?.label ?? '',
+        score: s.score,
+      })),
+      average,
+    }
+  })
+}
+
 export interface StudentSubmissionStatus {
   studentId: string
   name: string | null
