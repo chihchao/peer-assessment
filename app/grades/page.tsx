@@ -72,16 +72,31 @@ export default async function GradesPage() {
     .eq('status', 'graded')
     .order('created_at', { ascending: false })
 
-  const { data: grades } = await supabase
-    .from('grades')
-    .select('id, score, student_id, assignment_id, users(name, email)')
-    .order('score', { ascending: false })
+  const assignmentIds = (assignments ?? []).map(a => a.id)
 
-  const gradesByAssignment = new Map<string, typeof grades>()
+  const [gradesData, submissionsData] = assignmentIds.length > 0
+    ? await Promise.all([
+        supabase.from('grades').select('id, score, student_id, assignment_id').in('assignment_id', assignmentIds).then(r => r.data ?? []),
+        supabase.from('submissions').select('id, student_id, assignment_id, users(name, email)').in('assignment_id', assignmentIds).then(r => r.data ?? []),
+      ])
+    : [[], []] as [never[], never[]]
+
+  const grades = gradesData
+  const submissions = submissionsData
+
+  // Build lookup: assignment_id → student_id → score
+  const gradeMap = new Map<string, Map<string, number>>()
   for (const g of grades ?? []) {
-    const list = gradesByAssignment.get(g.assignment_id) ?? []
-    list.push(g)
-    gradesByAssignment.set(g.assignment_id, list)
+    if (!gradeMap.has(g.assignment_id)) gradeMap.set(g.assignment_id, new Map())
+    gradeMap.get(g.assignment_id)!.set(g.student_id, g.score)
+  }
+
+  // Build lookup: assignment_id → submissions (with user info)
+  const submissionsByAssignment = new Map<string, NonNullable<typeof submissions>>()
+  for (const s of submissions ?? []) {
+    const list = submissionsByAssignment.get(s.assignment_id) ?? []
+    list.push(s)
+    submissionsByAssignment.set(s.assignment_id, list)
   }
 
   return (
@@ -94,16 +109,29 @@ export default async function GradesPage() {
         ) : (
           <div className="space-y-6">
             {assignments.map(a => {
-              const aGrades = gradesByAssignment.get(a.id) ?? []
+              const subs = submissionsByAssignment.get(a.id) ?? []
+              const aGradeMap = gradeMap.get(a.id) ?? new Map<string, number>()
+              // Sort: graded first (by score desc), then ungraded
+              const sorted = [...subs].sort((x, y) => {
+                const sx = aGradeMap.get(x.student_id)
+                const sy = aGradeMap.get(y.student_id)
+                if (sx !== undefined && sy !== undefined) return sy - sx
+                if (sx !== undefined) return -1
+                if (sy !== undefined) return 1
+                return 0
+              })
               return (
                 <Card key={a.id}>
                   <CardHeader>
                     <p className="text-xs text-foreground/50">{a.courses?.name}</p>
                     <CardTitle className="text-sm">{a.title}</CardTitle>
+                    <p className="text-xs text-foreground/50">
+                      已評分 {aGradeMap.size} / 繳交 {subs.length} 人
+                    </p>
                   </CardHeader>
                   <CardContent>
-                    {aGrades.length === 0 ? (
-                      <p className="text-sm text-foreground/60">無成績資料</p>
+                    {sorted.length === 0 ? (
+                      <p className="text-sm text-foreground/60">無繳交資料</p>
                     ) : (
                       <table className="w-full text-sm">
                         <thead>
@@ -114,13 +142,21 @@ export default async function GradesPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {aGrades.map(g => (
-                            <tr key={g.id} className="border-b border-border/50 last:border-0">
-                              <td className="py-1.5">{g.users?.name ?? '—'}</td>
-                              <td className="py-1.5 text-foreground/60">{g.users?.email ?? '—'}</td>
-                              <td className="py-1.5 text-right font-semibold">{g.score}</td>
-                            </tr>
-                          ))}
+                          {sorted.map(s => {
+                            const score = aGradeMap.get(s.student_id)
+                            return (
+                              <tr key={s.id} className="border-b border-border/50 last:border-0">
+                                <td className="py-1.5">{s.users?.name ?? '—'}</td>
+                                <td className="py-1.5 text-foreground/60">{s.users?.email ?? '—'}</td>
+                                <td className="py-1.5 text-right">
+                                  {score !== undefined
+                                    ? <span className="font-semibold">{score}</span>
+                                    : <span className="text-foreground/40">未評分</span>
+                                  }
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     )}
