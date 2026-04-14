@@ -66,8 +66,15 @@ export default async function GradesPage() {
           if (reviewIds.length > 0) {
             const { data: scores } = await supabase
               .from('review_scores')
-              .select('review_id, score, review_dimensions(label)')
+              .select('review_id, score, dimension_id')
               .in('review_id', reviewIds)
+
+            // Fetch dimension labels separately
+            const dimIds = [...new Set((scores ?? []).map(s => s.dimension_id))]
+            const { data: dimsRaw } = dimIds.length > 0
+              ? await supabase.from('review_dimensions').select('id, label').in('id', dimIds)
+              : { data: [] }
+            const dimMap = new Map((dimsRaw ?? []).map(d => [d.id, d.label]))
 
             const tempMap = new Map<string, ReceivedReview[]>()
             ;(reviews ?? []).forEach((rev) => {
@@ -82,10 +89,7 @@ export default async function GradesPage() {
               const list = tempMap.get(assignId) ?? []
               list.push({
                 reviewIndex: list.length + 1,
-                scores: revScores.map(s => ({
-                  label: (s.review_dimensions as { label: string } | null)?.label ?? '',
-                  score: s.score,
-                })),
+                scores: revScores.map(s => ({ label: dimMap.get(s.dimension_id) ?? '', score: s.score })),
                 average: avg,
               })
               tempMap.set(assignId, list)
@@ -190,20 +194,33 @@ export default async function GradesPage() {
 
   const [{ data: gradesRaw }, { data: submissionsRaw }] = await Promise.all([
     supabase.from('grades').select('id, score, student_id, assignment_id').in('assignment_id', assignmentIds),
-    supabase.from('submissions').select('id, student_id, assignment_id, users(name, email)').in('assignment_id', assignmentIds),
+    supabase.from('submissions').select('id, student_id, assignment_id').in('assignment_id', assignmentIds),
   ])
 
+  // Fetch user info for students separately to avoid PostgREST join issues
+  const studentIds = [...new Set((submissionsRaw ?? []).map(s => s.student_id))]
+  const { data: studentsRaw } = studentIds.length > 0
+    ? await supabase.from('users').select('id, name, email').in('id', studentIds)
+    : { data: [] }
+  const studentMap = new Map((studentsRaw ?? []).map(u => [u.id, u]))
+
   // Fetch detailed review scores inline (no external server action)
-  // pras for all assignments (teacher can see all via RLS)
   const { data: pras } = await supabase
     .from('peer_review_assignments')
-    .select('id, submission_id, reviewer_id, users!reviewer_id(name)')
+    .select('id, submission_id, reviewer_id')
     .in('assignment_id', assignmentIds)
     .not('completed_at', 'is', null)
 
+  // Fetch reviewer names separately
+  const reviewerIds = [...new Set((pras ?? []).map(p => p.reviewer_id))]
+  const { data: reviewersRaw } = reviewerIds.length > 0
+    ? await supabase.from('users').select('id, name').in('id', reviewerIds)
+    : { data: [] }
+  const reviewerMap = new Map((reviewersRaw ?? []).map(u => [u.id, u.name]))
+
   const praIds = (pras ?? []).map(p => p.id)
   const praToSub = new Map((pras ?? []).map(p => [p.id, p.submission_id]))
-  const praReviewer = new Map((pras ?? []).map(p => [p.id, (p.users as { name: string | null } | null)?.name ?? null]))
+  const praReviewer = new Map((pras ?? []).map(p => [p.id, reviewerMap.get(p.reviewer_id) ?? null]))
 
   let reviewScoresBySubmission = new Map<string, { reviewerName: string | null; scores: { label: string; score: number }[]; average: number }[]>()
 
@@ -219,8 +236,15 @@ export default async function GradesPage() {
     if (reviewIds.length > 0) {
       const { data: scores } = await supabase
         .from('review_scores')
-        .select('review_id, score, review_dimensions(label)')
+        .select('review_id, score, dimension_id')
         .in('review_id', reviewIds)
+
+      // Fetch dimension labels separately
+      const dimIds = [...new Set((scores ?? []).map(s => s.dimension_id))]
+      const { data: dimsRaw } = dimIds.length > 0
+        ? await supabase.from('review_dimensions').select('id, label').in('id', dimIds)
+        : { data: [] }
+      const dimMap = new Map((dimsRaw ?? []).map(d => [d.id, d.label]))
 
       ;(reviews ?? []).forEach(rev => {
         const praId = reviewToPra.get(rev.id)
@@ -234,7 +258,7 @@ export default async function GradesPage() {
         const list = reviewScoresBySubmission.get(subId) ?? []
         list.push({
           reviewerName: praReviewer.get(praId) ?? null,
-          scores: revScores.map(s => ({ label: (s.review_dimensions as { label: string } | null)?.label ?? '', score: s.score })),
+          scores: revScores.map(s => ({ label: dimMap.get(s.dimension_id) ?? '', score: s.score })),
           average: avg,
         })
         reviewScoresBySubmission.set(subId, list)
@@ -293,8 +317,8 @@ export default async function GradesPage() {
                           <div key={s.id} className="border border-border rounded-md overflow-hidden">
                             <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
                               <div>
-                                <span className="font-medium text-sm">{(s.users as { name: string | null } | null)?.name ?? '—'}</span>
-                                <span className="text-xs text-foreground/50 ml-2">{(s.users as { email: string } | null)?.email ?? '—'}</span>
+                                <span className="font-medium text-sm">{studentMap.get(s.student_id)?.name ?? '—'}</span>
+                                <span className="text-xs text-foreground/50 ml-2">{studentMap.get(s.student_id)?.email ?? '—'}</span>
                               </div>
                               <div className="text-right">
                                 {score !== undefined
