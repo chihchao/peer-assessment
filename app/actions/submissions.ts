@@ -37,7 +37,11 @@ export async function submitAssignment(assignmentId: string, formData: FormData)
 
   // Collect field values from formData
   // Format: field_<index>_id / field_<index>_label / field_<index>_value or extra_<index>_label / extra_<index>_value
-  const fieldValues: FieldValue[] = []
+  const fieldValues: (FieldValue & { is_private?: boolean })[] = []
+
+  // "基本資料" — private field visible to teacher only, stored at order -1
+  const basicInfo = (formData.get('basic_info') as string) ?? ''
+  fieldValues.push({ field_id: null, label: '基本資料', value: basicInfo, order: -1, is_private: true })
 
   // Teacher-defined fields
   let i = 0
@@ -106,7 +110,7 @@ export async function getMySubmission(assignmentId: string) {
     .from('submissions')
     .select(`
       *,
-      submission_field_values(id, field_id, label, value, order)
+      submission_field_values(id, field_id, label, value, order, is_private)
     `)
     .eq('assignment_id', assignmentId)
     .eq('student_id', user.id)
@@ -212,7 +216,7 @@ export async function getReviewDetail(peerReviewAssignmentId: string) {
       assignments(title, scale_min, scale_max, review_dimensions(id, label, order)),
       submissions(
         student_id,
-        submission_field_values(id, label, value, order, field_id)
+        submission_field_values(id, label, value, order, field_id, is_private)
       )
     `)
     .eq('id', peerReviewAssignmentId)

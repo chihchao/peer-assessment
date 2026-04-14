@@ -253,6 +253,7 @@ export default async function AssignmentDetailPage({
                           value: fv.value,
                           fieldId: fv.field_id ?? undefined,
                           order: fv.order,
+                          isPrivate: (fv as { is_private?: boolean }).is_private ?? false,
                         }))
                     : undefined
                 }

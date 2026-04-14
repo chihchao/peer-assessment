@@ -20,9 +20,9 @@ export default async function PeerReviewDetailPage({ params }: { params: Promise
 
   const assignment = detail.assignments
   const submission = detail.submissions
-  const fieldValues = [...(submission?.submission_field_values ?? [])].sort(
-    (a: { order: number }, b: { order: number }) => a.order - b.order
-  )
+  const fieldValues = [...(submission?.submission_field_values ?? [])]
+    .filter((fv: { is_private?: boolean }) => !fv.is_private)
+    .sort((a: { order: number }, b: { order: number }) => a.order - b.order)
   const dimensions = [...(assignment?.review_dimensions ?? [])].sort(
     (a: { order: number }, b: { order: number }) => a.order - b.order
   )

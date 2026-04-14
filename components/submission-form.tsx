@@ -17,6 +17,7 @@ interface InitialValue {
   value: string
   fieldId?: string
   order: number
+  isPrivate?: boolean
 }
 
 interface SubmissionFormProps {
@@ -35,9 +36,12 @@ export function SubmissionForm({ assignmentId, fields, initialValues }: Submissi
       .map(iv => [iv.fieldId!, iv.value])
   )
 
-  // Student-added extra fields: only store values; labels are auto-generated
+  // Pre-fill basic_info from previous submission (isPrivate row with label '基本資料')
+  const initialBasicInfo = (initialValues ?? []).find(iv => iv.isPrivate && iv.label === '基本資料')?.value ?? ''
+
+  // Student-added extra fields: only store values (exclude private rows)
   const initialExtras = (initialValues ?? [])
-    .filter(iv => !iv.fieldId)
+    .filter(iv => !iv.fieldId && !iv.isPrivate)
     .sort((a, b) => a.order - b.order)
     .map(iv => iv.value)
 
@@ -112,6 +116,14 @@ export function SubmissionForm({ assignmentId, fields, initialValues }: Submissi
           {error}
         </p>
       )}
+
+      {/* Basic info — private, teacher-only */}
+      <Input
+        name="basic_info"
+        label="基本資料"
+        defaultValue={initialBasicInfo}
+        placeholder="（選填，僅教師可見）"
+      />
 
       {/* Textarea fields first */}
       {textareaFields.map(renderField)}

@@ -305,6 +305,7 @@ export type Database = {
         Row: {
           field_id: string | null
           id: string
+          is_private: boolean
           label: string
           order: number
           submission_id: string
@@ -313,6 +314,7 @@ export type Database = {
         Insert: {
           field_id?: string | null
           id?: string
+          is_private?: boolean
           label: string
           order?: number
           submission_id: string
@@ -321,6 +323,7 @@ export type Database = {
         Update: {
           field_id?: string | null
           id?: string
+          is_private?: boolean
           label?: string
           order?: number
           submission_id?: string
@@ -408,7 +411,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_my_graded_submission_ids: { Args: never; Returns: string[] }
+      get_my_role: { Args: never; Returns: string }
     }
     Enums: {
       assignment_status: "draft" | "open" | "reviewing" | "graded"
