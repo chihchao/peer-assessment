@@ -174,7 +174,7 @@ export default async function GradesPage() {
   // ─── Teacher / TA view ────────────────────────────────────────────────────
   const { data: assignments } = await supabase
     .from('assignments')
-    .select('id, title, status, course_id, courses(name, teacher_id)')
+    .select('id, title, status, course_id, courses(id, name, teacher_id)')
     .eq('status', 'graded')
     .order('created_at', { ascending: false })
 
@@ -222,7 +222,7 @@ export default async function GradesPage() {
   const praToSub = new Map((pras ?? []).map(p => [p.id, p.submission_id]))
   const praReviewer = new Map((pras ?? []).map(p => [p.id, reviewerMap.get(p.reviewer_id) ?? null]))
 
-  let reviewScoresBySubmission = new Map<string, { reviewerName: string | null; scores: { label: string; score: number }[]; average: number }[]>()
+  const reviewScoresBySubmission = new Map<string, { reviewerName: string | null; scores: { label: string; score: number }[]; average: number }[]>()
 
   if (praIds.length > 0) {
     const { data: reviews } = await supabase
@@ -280,13 +280,45 @@ export default async function GradesPage() {
     subsByAssignment.set(s.assignment_id, list)
   }
 
+  // Group assignments by course
+  type CourseInfo = { id: string; name: string }
+  const courseMap = new Map<string, CourseInfo>()
+  const assignmentsByCourse = new Map<string, NonNullable<typeof assignments>>()
+  for (const a of assignments ?? []) {
+    const c = a.courses as CourseInfo | null
+    if (!c) continue
+    if (!courseMap.has(a.course_id)) courseMap.set(a.course_id, c)
+    const list = assignmentsByCourse.get(a.course_id) ?? []
+    list.push(a)
+    assignmentsByCourse.set(a.course_id, list)
+  }
+
   return (
     <>
       <Navbar user={navUser} signOutAction={signOut} />
       <PageWrapper>
         <PageHeader title="成績總覽" subtitle="所有已評分作業" />
-        <div className="space-y-6">
-          {(assignments ?? []).map(a => {
+        <div className="space-y-10">
+          {[...courseMap.entries()].map(([courseId, courseInfo]) => {
+            const courseAssignments = assignmentsByCourse.get(courseId) ?? []
+            return (
+              <div key={courseId}>
+                {/* Course header with export button */}
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-semibold text-foreground">{courseInfo.name}</h2>
+                  <a
+                    href={`/api/export/grades?courseId=${courseId}`}
+                    download
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border bg-transparent text-foreground hover:bg-muted transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    匯出課程成績 CSV
+                  </a>
+                </div>
+                <div className="space-y-6">
+                  {courseAssignments.map(a => {
             const subs = subsByAssignment.get(a.id) ?? []
             const aGradeMap = gradeMap.get(a.id) ?? new Map<string, number>()
             const sorted = [...subs].sort((x, y) => {
@@ -300,9 +332,8 @@ export default async function GradesPage() {
             return (
               <Card key={a.id}>
                 <CardHeader>
-                  <p className="text-xs text-foreground/50">{(a.courses as { name: string } | null)?.name}</p>
                   <CardTitle className="text-sm">{a.title}</CardTitle>
-                  <p className="text-xs text-foreground/50">已評分 {aGradeMap.size} / 繳交 {subs.length} 人</p>
+                  <p className="text-xs text-foreground/50 mt-0.5">已評分 {aGradeMap.size} / 繳交 {subs.length} 人</p>
                 </CardHeader>
                 <CardContent>
                   {sorted.length === 0 ? (
@@ -360,6 +391,10 @@ export default async function GradesPage() {
                   )}
                 </CardContent>
               </Card>
+            )
+                  })}
+                </div>
+              </div>
             )
           })}
         </div>
