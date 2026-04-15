@@ -36,7 +36,7 @@ Navbar 接受 `user: { name: string; email: string; role: string; avatarUrl?: st
 PageHeader 使用 `<h1>` 作為標題（font-bold text-2xl text-foreground），確保頁面 heading 層級正確。
 
 #### Scenario: 標準頁面標題
-- **WHEN** 頁面使用 `<PageHeader title="互評作業" subtitle="GEAI1017 - 2026 春季" />`
+- **WHEN** 頁面使用 `<PageHeader title="互評作業" subtitle="互評平台 - 2026 春季" />`
 - **THEN** 頁面頂部顯示清晰的 h1 標題與灰色副標題
 
 #### Scenario: 帶有操作按鈕

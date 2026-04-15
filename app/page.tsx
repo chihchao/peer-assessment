@@ -41,7 +41,7 @@ export default async function HomePage() {
       <PageWrapper>
         <PageHeader
           title={`歡迎，${navUser.name}`}
-          subtitle="GEAI1017 學習平台"
+          subtitle="互評平台"
         />
 
         <Card className="max-w-sm">

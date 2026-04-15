@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Web-based student report peer assessment platform (GEAI1017). Three roles: **Student**, **Teacher**, **TA**.
+Web-based student report peer assessment platform (互評平台). Three roles: **Student**, **Teacher**, **TA**.
 
 ## Tech Stack
 

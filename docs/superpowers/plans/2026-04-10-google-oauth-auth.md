@@ -449,7 +449,7 @@ export default function LoginPage({
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-md">
         <h1 className="mb-2 text-center text-2xl font-bold text-gray-900">
-          學習平台
+          互評平台
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500">
           使用 Google 帳號登入
