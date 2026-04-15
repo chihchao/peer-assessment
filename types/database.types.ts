@@ -93,8 +93,45 @@ export type Database = {
           },
         ]
       }
+      course_enrollments: {
+        Row: {
+          course_id: string
+          enrolled_at: string
+          id: string
+          student_id: string
+        }
+        Insert: {
+          course_id: string
+          enrolled_at?: string
+          id?: string
+          student_id: string
+        }
+        Update: {
+          course_id?: string
+          enrolled_at?: string
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_enrollments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_enrollments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courses: {
         Row: {
+          code: string
           created_at: string
           description: string | null
           id: string
@@ -102,6 +139,7 @@ export type Database = {
           teacher_id: string
         }
         Insert: {
+          code?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -109,6 +147,7 @@ export type Database = {
           teacher_id: string
         }
         Update: {
+          code?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -411,6 +450,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      enroll_by_code: {
+        Args: { p_code: string; p_student_id: string }
+        Returns: undefined
+      }
       get_my_graded_submission_ids: { Args: never; Returns: string[] }
       get_my_role: { Args: never; Returns: string }
     }

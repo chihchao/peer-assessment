@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { CopyCodeButton } from './_components/copy-code-button'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',
@@ -57,6 +58,16 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             ) : undefined
           }
         />
+
+        {isOwner && (
+          <div className="mb-6 flex items-center gap-3">
+            <span className="text-sm font-medium text-foreground/60">課程代碼</span>
+            <code className="rounded-md border border-border bg-muted px-3 py-1.5 font-mono text-base font-semibold tracking-widest text-foreground">
+              {course.code}
+            </code>
+            <CopyCodeButton code={course.code} />
+          </div>
+        )}
 
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">作業列表</h2>

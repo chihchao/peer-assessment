@@ -28,6 +28,14 @@ export default async function NewCoursePage() {
                 placeholder="請輸入課程名稱"
                 required
               />
+              <Input
+                name="code"
+                label="課程代碼（選填，留空自動產生）"
+                placeholder="例如：ABC123"
+                maxLength={6}
+                helperText="6 位英文字母或數字，不區分大小寫"
+                className="uppercase"
+              />
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-foreground">課程說明（選填）</label>
                 <textarea

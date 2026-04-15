@@ -33,6 +33,15 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
                 defaultValue={course.name}
                 required
               />
+              <Input
+                name="code"
+                label="課程代碼"
+                defaultValue={course.code}
+                maxLength={6}
+                helperText="6 位英文字母或數字，變更代碼會讓舊代碼失效"
+                className="uppercase"
+                required
+              />
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-foreground">課程說明（選填）</label>
                 <textarea

@@ -7,6 +7,7 @@ import { PageWrapper } from '@/components/layout/page-wrapper'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { JoinCourseForm } from './_components/join-course-form'
 
 export default async function CoursesPage() {
   const { navUser } = await requireAuth()
@@ -29,6 +30,8 @@ export default async function CoursesPage() {
           }
         />
 
+        {!isTeacher && <JoinCourseForm />}
+
         {courses.length === 0 ? (
           <p className="text-foreground/60">尚無課程。{isTeacher && '請點擊「新增課程」建立第一門課程。'}</p>
         ) : (
@@ -43,9 +46,16 @@ export default async function CoursesPage() {
                     )}
                   </CardHeader>
                   <CardContent>
-                    <p className="text-xs text-foreground/50">
-                      建立於 {new Date(course.created_at).toLocaleDateString('zh-TW')}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-foreground/50">
+                        建立於 {new Date(course.created_at).toLocaleDateString('zh-TW')}
+                      </p>
+                      {isTeacher && (
+                        <code className="text-xs font-mono font-semibold text-foreground/70 tracking-wider">
+                          {course.code}
+                        </code>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </Link>
