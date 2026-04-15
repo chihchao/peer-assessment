@@ -66,12 +66,16 @@ Re-exported from `components/layout/index.ts`.
 | AssignmentForm | `assignment-form.tsx` | Client | Dynamic form for creating/editing assignments; manages field & dimension arrays; used by teacher create/edit pages |
 | SubmissionForm | `submission-form.tsx` | Client | Student submission form; textarea fields rendered first, single-line fields second; accepts optional `initialValues` prop for edit/pre-fill mode; "新增欄位" adds a value-only extra field (label auto-generated); submit button shows "更新繳交" when editing |
 | ReviewForm | `review-form.tsx` | Client | Peer review rating form; one numeric input per dimension; enforces scale bounds before submission |
+| SubmissionStatusTable | `submission-status-table.tsx` | Client | Teacher-facing table of student submission status; expand/collapse inline preview (separates private vs public fields); links to `/submissions/[sid]` detail page |
+| LinkifiedText | `linkified-text.tsx` | Server | Renders plain text with auto-linked URLs (`<a target="_blank">`) using regex; used in submission detail pages |
 
 ### Hooks (`hooks/`)
 
 - `use-toast.ts` — `useToast()` managing toast state with 4s auto-dismiss; methods: `toast.success/error/warning/info`
 
 ### Role-based Navigation (Navbar)
+
+Logo text: **互評平台** (links to `/`).
 
 ```
 student: 課程 (/courses), 互評任務 (/peer-review), 成績查詢 (/grades)
@@ -183,6 +187,7 @@ Supabase MCP is configured in `.mcp.json`. Use `mcp__supabase__apply_migration` 
 | `label` | `text` | field label (copied at submission time) |
 | `value` | `text` | default `''` |
 | `order` | `int` | default `0` |
+| `is_private` | `bool` | default `false`; `true` for the built-in「基本資料」field (order -1) — visible to teacher only, hidden from peer reviewers |
 
 **`peer_review_assignments`** — which student reviews which submission
 
@@ -240,7 +245,13 @@ All tables have RLS enabled. RLS summary:
 | `app/actions.ts` | `signOut` |
 | `app/actions/courses.ts` | `createCourse`, `updateCourse`, `deleteCourse`, `getCourses`, `getCourse` |
 | `app/actions/assignments.ts` | `createAssignment`, `updateAssignment`, `deleteAssignment`, `publishAssignment`, `activatePeerReview`, `activateGradeCalculation`, `getAssignment`, `getCourseAssignments` |
-| `app/actions/submissions.ts` | `submitAssignment` (upsert — supports edit), `submitReview`, `getMySubmission`, `getPendingReviews`, `getReviewDetail` |
+| `app/actions/submissions.ts` | `submitAssignment` (upsert — supports edit; always writes private「基本資料」field at order -1), `submitReview`, `getMySubmission`, `getPendingReviews`, `getReviewDetail`, `getAssignmentDetailedScores`, `getMyReceivedReviews`, `getAssignmentSubmissionStatus`, `getAssignmentPeerReviewStatus` |
+
+### API Routes
+
+| Route | File | Auth | Description |
+|-------|------|------|-------------|
+| `GET /api/export/grades?courseId=` | `app/api/export/grades/route.ts` | Teacher/TA | Downloads CSV (UTF-8 BOM) for all graded assignments in a course; includes private「基本資料」column, per-reviewer dimension scores, and final grade |
 
 ### Grade Calculation Algorithm (`activateGradeCalculation`)
 
@@ -268,6 +279,7 @@ Fisher-Yates shuffle of submissions, then each student reviews the next `reviewe
 | `/courses/[id]/assignments/new` | `app/courses/[id]/assignments/new/page.tsx` | Teacher | Complete |
 | `/courses/[id]/assignments/[aid]` | `app/courses/[id]/assignments/[aid]/page.tsx` | All | Complete — teacher: lifecycle buttons; student: submit (blank fields allowed) or edit submission (pre-filled form, upsert); read-only view when not open |
 | `/courses/[id]/assignments/[aid]/edit` | `app/courses/[id]/assignments/[aid]/edit/page.tsx` | Teacher | Complete — blocked if status ≠ draft |
+| `/courses/[id]/assignments/[aid]/submissions/[sid]` | `app/courses/[id]/assignments/[aid]/submissions/[sid]/page.tsx` | Teacher (owner) | Complete — full submission detail; separates private (教師專屬) and public fields; uses `LinkifiedText` for URL auto-linking |
 | `/assignments` | `app/assignments/page.tsx` | Teacher, TA | Complete — lists open assignments (removed from student navbar) |
 | `/peer-review` | `app/peer-review/page.tsx` | Student | Complete — pending review list |
 | `/peer-review/[rid]` | `app/peer-review/[rid]/page.tsx` | Student | Complete — side-by-side submission view + rating form |

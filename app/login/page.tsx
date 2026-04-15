@@ -24,8 +24,8 @@ export default function LoginPage() {
     <main className="flex min-h-dvh flex-col items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">GEAI1017 互評平台</CardTitle>
-          <CardDescription className="mt-1">使用 Google 帳號登入</CardDescription>
+          <CardTitle className="text-2xl">互評平台</CardTitle>
+          <CardDescription className="mt-1">請先以 Google 帳號登入，選擇課程後即可開始繳交作業及互評。</CardDescription>
         </CardHeader>
         <CardContent>
           <Button
