@@ -52,7 +52,7 @@ export function Navbar({ user, signOutAction }: NavbarProps) {
         href="/"
         className="text-primary font-bold text-base mr-8 shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        GEAI1017
+        互評平台
       </Link>
 
       {/* Navigation links */}

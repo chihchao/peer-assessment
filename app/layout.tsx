@@ -10,7 +10,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "GEAI1017 互評平台",
+  title: "互評平台",
   description: "大學生報告互評平台",
 };
 
