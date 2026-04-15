@@ -69,6 +69,15 @@ Re-exported from `components/layout/index.ts`.
 | SubmissionStatusTable | `submission-status-table.tsx` | Client | Teacher-facing table of student submission status; expand/collapse inline preview (separates private vs public fields); links to `/submissions/[sid]` detail page |
 | LinkifiedText | `linkified-text.tsx` | Server | Renders plain text with auto-linked URLs (`<a target="_blank">`) using regex; used in submission detail pages |
 
+### Route-Specific Components
+
+Co-located under their route directories (`app/.../`):
+
+| Component | File | Type | Description |
+|-----------|------|------|-------------|
+| JoinCourseForm | `app/courses/_components/join-course-form.tsx` | Client | Input + submit button for student course enrollment via 6-char code; shown on `/courses` for non-teacher roles |
+| CopyCodeButton | `app/courses/[id]/_components/copy-code-button.tsx` | Client | Clipboard copy button with "已複製" feedback; shown on `/courses/[id]` for teachers |
+
 ### Hooks (`hooks/`)
 
 - `use-toast.ts` — `useToast()` managing toast state with 4s auto-dismiss; methods: `toast.success/error/warning/info`
@@ -132,6 +141,7 @@ Supabase MCP is configured in `.mcp.json`. Use `mcp__supabase__apply_migration` 
 | `teacher_id` | `uuid` | FK → `users.id` (cascade delete) |
 | `name` | `text` | |
 | `description` | `text` | nullable |
+| `code` | `text` | unique; 6-char alphanumeric; auto-generated or manually set; used for student enrollment |
 | `created_at` | `timestamptz` | |
 
 **`assignments`** — assignments within a course; lifecycle: `draft → open → reviewing → graded`
@@ -230,6 +240,17 @@ UNIQUE `(review_id, dimension_id)` — one score per dimension per review.
 | `score` | `numeric` | trim-average result |
 | `calculated_at` | `timestamptz` | |
 
+**`course_enrollments`** — student enrollment in courses via course code
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `uuid` PK | |
+| `course_id` | `uuid` | FK → `courses.id` (cascade delete) |
+| `student_id` | `uuid` | FK → `users.id` |
+| `enrolled_at` | `timestamptz` | |
+
+UNIQUE `(course_id, student_id)` — prevents duplicate enrollments.
+
 All tables have RLS enabled. RLS summary:
 - `courses`: teacher (owner) all; others SELECT only
 - `assignments`, `assignment_fields`, `review_dimensions`: teacher (course owner) all; others SELECT
@@ -237,13 +258,23 @@ All tables have RLS enabled. RLS summary:
 - `peer_review_assignments`: reviewer SELECT own; teacher/TA SELECT all; teacher INSERT; reviewer UPDATE
 - `reviews`, `review_scores`: reviewer all own; teacher/TA SELECT all
 - `grades`: student SELECT own; teacher/TA SELECT all; teacher (course owner) all
+- `course_enrollments`: student SELECT/INSERT own; teacher SELECT all (for their courses)
+
+### Database Functions (RPC)
+
+| Function | Args | Returns | Notes |
+|----------|------|---------|-------|
+| `enroll_by_code` | `p_code text, p_student_id uuid` | `void` | Enrolls student by course code; raises exception if code invalid or already enrolled |
+| `get_my_role` | — | `text` | Returns current user's role string |
+| `get_my_graded_submission_ids` | — | `text[]` | Returns IDs of submissions that have been graded for the current user |
 
 ## Server Actions
 
 | File | Exports |
 |------|---------|
 | `app/actions.ts` | `signOut` |
-| `app/actions/courses.ts` | `createCourse`, `updateCourse`, `deleteCourse`, `getCourses`, `getCourse` |
+| `app/login/actions.ts` | `signInWithGoogle` — triggers Google OAuth redirect |
+| `app/actions/courses.ts` | `createCourse`, `updateCourse`, `deleteCourse`, `getCourses`, `getCourse`, `enrollCourse` (student enrollment via 6-char code; calls `enroll_by_code` RPC) |
 | `app/actions/assignments.ts` | `createAssignment`, `updateAssignment`, `deleteAssignment`, `publishAssignment`, `activatePeerReview`, `activateGradeCalculation`, `getAssignment`, `getCourseAssignments` |
 | `app/actions/submissions.ts` | `submitAssignment` (upsert — supports edit; always writes private「基本資料」field at order -1), `submitReview`, `getMySubmission`, `getPendingReviews`, `getReviewDetail`, `getAssignmentDetailedScores`, `getMyReceivedReviews`, `getAssignmentSubmissionStatus`, `getAssignmentPeerReviewStatus` |
 
@@ -272,10 +303,10 @@ Fisher-Yates shuffle of submissions, then each student reviews the next `reviewe
 | `/login` | `app/login/page.tsx` | All | Complete |
 | `/` | `app/page.tsx` | Teacher, TA | Complete — students are redirected to `/courses`; teachers/TAs see welcome card |
 | `/auth/callback` | `app/auth/callback/route.ts` | — | Complete — OAuth callback |
-| `/courses` | `app/courses/page.tsx` | All | Complete — student landing page after login; teacher: create button; others: read-only |
-| `/courses/new` | `app/courses/new/page.tsx` | Teacher | Complete |
-| `/courses/[id]` | `app/courses/[id]/page.tsx` | All | Complete — teacher: edit/delete/add-assignment |
-| `/courses/[id]/edit` | `app/courses/[id]/edit/page.tsx` | Teacher | Complete |
+| `/courses` | `app/courses/page.tsx` | All | Complete — student landing page after login; teacher: create button + course code displayed on cards; students/TAs: `JoinCourseForm` to enroll via code |
+| `/courses/new` | `app/courses/new/page.tsx` | Teacher | Complete — optional code input (auto-generates 6-char code if blank) |
+| `/courses/[id]` | `app/courses/[id]/page.tsx` | All | Complete — teacher: edit/delete/add-assignment + course code with `CopyCodeButton` |
+| `/courses/[id]/edit` | `app/courses/[id]/edit/page.tsx` | Teacher | Complete — includes editable code field (6-char alphanumeric validation) |
 | `/courses/[id]/assignments/new` | `app/courses/[id]/assignments/new/page.tsx` | Teacher | Complete |
 | `/courses/[id]/assignments/[aid]` | `app/courses/[id]/assignments/[aid]/page.tsx` | All | Complete — teacher: lifecycle buttons; student: submit (blank fields allowed) or edit submission (pre-filled form, upsert); read-only view when not open |
 | `/courses/[id]/assignments/[aid]/edit` | `app/courses/[id]/assignments/[aid]/edit/page.tsx` | Teacher | Complete — blocked if status ≠ draft |
@@ -295,7 +326,7 @@ Fisher-Yates shuffle of submissions, then each student reviews the next `reviewe
 
 Core academic workflow is complete. Potential future enhancements:
 
-- **Course enrollment**: a `course_enrollments` table so students only see courses/assignments they are enrolled in (currently all students see all courses)
+- **Enrollment-gated visibility**: filter courses/assignments so students only see content for courses they enrolled in (schema is in place; display logic not yet scoped)
 - **Notifications**: alert students when peer review is activated or grades are published
 - **TA write access**: allow TA to manage stuck workflows (currently read-only)
 - **Assignment excusal**: teacher ability to mark a student as excused before activating peer review
