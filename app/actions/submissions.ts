@@ -49,7 +49,7 @@ export async function submitAssignment(assignmentId: string, formData: FormData)
     const field_id = formData.get(`field_${i}_id`) as string
     const label = formData.get(`field_${i}_label`) as string
     const value = (formData.get(`field_${i}_value`) as string) ?? ''
-    fieldValues.push({ field_id, label, value, order: i })
+    fieldValues.push({ field_id, label, value, order: i, is_private: false })
     i++
   }
 
@@ -59,7 +59,7 @@ export async function submitAssignment(assignmentId: string, formData: FormData)
     const label = (formData.get(`extra_${j}_label`) as string)?.trim()
     const value = (formData.get(`extra_${j}_value`) as string) ?? ''
     if (label) {
-      fieldValues.push({ field_id: null, label, value, order: i + j })
+      fieldValues.push({ field_id: null, label, value, order: i + j, is_private: false })
     }
     j++
   }
@@ -376,19 +376,33 @@ export interface StudentSubmissionStatus {
 export async function getAssignmentSubmissionStatus(assignmentId: string): Promise<StudentSubmissionStatus[]> {
   const supabase = await createClient()
 
-  const [{ data: students }, { data: submissions }] = await Promise.all([
-    supabase.from('users').select('id, name, email').eq('role', 'student'),
+  const { data: assignment } = await supabase
+    .from('assignments')
+    .select('course_id')
+    .eq('id', assignmentId)
+    .single()
+
+  if (!assignment) return []
+
+  const [{ data: enrollments }, { data: submissions }] = await Promise.all([
+    supabase
+      .from('course_enrollments')
+      .select('student_id, users!student_id(id, name, email)')
+      .eq('course_id', assignment.course_id),
     supabase.from('submissions').select('student_id, submitted_at').eq('assignment_id', assignmentId),
   ])
 
   const submissionMap = new Map((submissions ?? []).map(s => [s.student_id, s.submitted_at]))
 
-  return (students ?? []).map(s => ({
-    studentId: s.id,
-    name: s.name,
-    email: s.email,
-    submittedAt: submissionMap.get(s.id) ?? null,
-  }))
+  return (enrollments ?? []).map(e => {
+    const user = e.users as { id: string; name: string | null; email: string } | null
+    return {
+      studentId: e.student_id,
+      name: user?.name ?? null,
+      email: user?.email ?? '',
+      submittedAt: submissionMap.get(e.student_id) ?? null,
+    }
+  })
 }
 
 export interface ReviewerProgress {
