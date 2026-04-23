@@ -215,7 +215,7 @@ export async function activatePeerReview(id: string) {
 
   const { data: assignment } = await supabase
     .from('assignments')
-    .select('id, status, reviewer_count, courses!inner(teacher_id)')
+    .select('id, status, reviewer_count, course_id, courses!inner(teacher_id)')
     .eq('id', id)
     .single()
 
@@ -223,23 +223,10 @@ export async function activatePeerReview(id: string) {
   if ((assignment.courses as { teacher_id: string }).teacher_id !== user.id) return { error: '未授權' }
   if (assignment.status !== 'open') return { error: '只能對開放中的作業啟動互評' }
 
-  // Get all students who have not yet submitted
-  const { data: allStudents } = await supabase
-    .from('users')
-    .select('id')
-    .eq('role', 'student')
-
   const { data: submissions } = await supabase
     .from('submissions')
     .select('id, student_id')
     .eq('assignment_id', id)
-
-  const submittedIds = new Set((submissions ?? []).map(s => s.student_id))
-  const missingStudents = (allStudents ?? []).filter(s => !submittedIds.has(s.id))
-
-  if (missingStudents.length > 0) {
-    return { error: `尚有 ${missingStudents.length} 位學生未繳交作業，無法啟動互評` }
-  }
 
   if ((submissions ?? []).length === 0) {
     return { error: '沒有學生繳交作業' }
