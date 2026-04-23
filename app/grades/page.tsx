@@ -16,16 +16,25 @@ export default async function GradesPage() {
   if (isStudent) {
     const { data: { user } } = await supabase.auth.getUser()
 
+    const { data: enrollments } = await supabase
+      .from('course_enrollments')
+      .select('course_id')
+
+    const enrolledCourseIds = (enrollments ?? []).map(e => e.course_id)
+
     const [{ data: grades }, { data: assignments }] = await Promise.all([
       supabase
         .from('grades')
         .select('id, score, calculated_at, assignment_id')
         .order('calculated_at', { ascending: false }),
-      supabase
-        .from('assignments')
-        .select('id, title, status, course_id, courses(name)')
-        .in('status', ['open', 'reviewing', 'graded'])
-        .order('created_at', { ascending: false }),
+      enrolledCourseIds.length > 0
+        ? supabase
+            .from('assignments')
+            .select('id, title, status, course_id, courses(name)')
+            .in('status', ['open', 'reviewing', 'graded'])
+            .in('course_id', enrolledCourseIds)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] }),
     ])
 
     // Build received-review breakdown for graded assignments
