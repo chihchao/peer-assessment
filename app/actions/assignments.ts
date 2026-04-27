@@ -288,17 +288,6 @@ export async function activateGradeCalculation(id: string) {
   if ((assignment.courses as { teacher_id: string }).teacher_id !== user.id) return { error: '未授權' }
   if (assignment.status !== 'reviewing') return { error: '只能對互評中的作業計算成績' }
 
-  // Check all reviews are complete
-  const { data: peerAssignments } = await supabase
-    .from('peer_review_assignments')
-    .select('id, completed_at')
-    .eq('assignment_id', id)
-
-  const incomplete = (peerAssignments ?? []).filter(p => !p.completed_at)
-  if (incomplete.length > 0) {
-    return { error: `尚有 ${incomplete.length} 份互評未完成` }
-  }
-
   // Fetch all submissions
   const { data: submissions } = await supabase
     .from('submissions')

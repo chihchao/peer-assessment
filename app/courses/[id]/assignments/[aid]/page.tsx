@@ -17,6 +17,7 @@ import { SubmissionForm } from '@/components/submission-form'
 import { LinkifiedText } from '@/components/linkified-text'
 import { SubmissionStatusTable } from '@/components/submission-status-table'
 import type { SubmissionRow } from '@/components/submission-status-table'
+import { GradeCalculationForm } from './_components/grade-calculation-form'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',
@@ -87,7 +88,11 @@ export default async function AssignmentDetailPage({
   const deleteAssignmentById = deleteAssignment.bind(null, aid) as unknown as () => Promise<void>
   const publishAssignmentById = publishAssignment.bind(null, aid) as unknown as () => Promise<void>
   const activatePeerReviewById = activatePeerReview.bind(null, aid) as unknown as () => Promise<void>
-  const activateGradeCalculationById = activateGradeCalculation.bind(null, aid) as unknown as () => Promise<void>
+
+  async function gradeCalcAction(_prevState: { error?: string } | null, _formData: FormData) {
+    'use server'
+    return activateGradeCalculation(aid)
+  }
 
   const sortedFields = [...(assignment.assignment_fields ?? [])].sort((a, b) => a.order - b.order)
   const sortedDimensions = [...(assignment.review_dimensions ?? [])].sort((a, b) => a.order - b.order)
@@ -123,9 +128,7 @@ export default async function AssignmentDetailPage({
                   </form>
                 )}
                 {assignment.status === 'reviewing' && (
-                  <form action={activateGradeCalculationById}>
-                    <Button type="submit">計算成績</Button>
-                  </form>
+                  <GradeCalculationForm action={gradeCalcAction} />
                 )}
               </div>
             ) : undefined
