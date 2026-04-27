@@ -89,7 +89,7 @@ export default async function AssignmentDetailPage({
   const publishAssignmentById = publishAssignment.bind(null, aid) as unknown as () => Promise<void>
   const activatePeerReviewById = activatePeerReview.bind(null, aid) as unknown as () => Promise<void>
 
-  async function gradeCalcAction(_prevState: { error?: string } | null, _formData: FormData) {
+  async function gradeCalcAction(_prevState: { error?: string } | { success: true } | null, _formData: FormData) {
     'use server'
     return activateGradeCalculation(aid)
   }

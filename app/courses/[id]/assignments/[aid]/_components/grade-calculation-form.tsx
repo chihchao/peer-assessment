@@ -3,8 +3,10 @@
 import { useActionState } from 'react'
 import { Button } from '@/components/ui/button'
 
+type ActionState = { error?: string } | { success: true } | null
+
 interface Props {
-  action: (prevState: { error?: string } | null, formData: FormData) => Promise<{ error?: string } | { success: true }>
+  action: (prevState: ActionState, formData: FormData) => Promise<ActionState>
 }
 
 export function GradeCalculationForm({ action }: Props) {
