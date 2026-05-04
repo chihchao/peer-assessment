@@ -9,63 +9,65 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar } from '@/components/ui/avatar'
 import { RoleBadge } from '@/components/ui/badge'
+import { RemoveStudentButton } from './_components/remove-student-button'
+
+type StudentRow = {
+  id: string
+  name: string | null
+  email: string
+  role: string
+  joinedAt: string
+}
 
 export default async function StudentsPage({
   searchParams,
 }: {
   searchParams: Promise<{ course?: string }>
 }) {
-  const { navUser } = await requireAuth()
+  const { navUser, userId } = await requireAuth()
   if (navUser.role === 'student') redirect('/')
 
   const { course: courseId } = await searchParams
   const supabase = await createClient()
 
-  // Fetch all courses for the filter tabs
-  const { data: courses } = await supabase
-    .from('courses')
-    .select('id, name')
-    .order('name')
+  // Fetch courses (teachers see their own; TAs see all)
+  const coursesQuery = supabase.from('courses').select('id, name, teacher_id').order('name')
+  const { data: courses } = await coursesQuery
 
-  let students: { id: string; name: string | null; email: string; role: string; created_at: string }[] = []
+  let students: StudentRow[] = []
 
   if (courseId) {
-    // Students who have submitted to any assignment in this course
-    const { data: submissions } = await supabase
-      .from('submissions')
-      .select('student_id, users!inner(id, name, email, role, created_at)')
-      .in(
-        'assignment_id',
-        (await supabase
-          .from('assignments')
-          .select('id')
-          .eq('course_id', courseId)
-          .then(r => r.data?.map(a => a.id) ?? []))
-      )
+    const { data: enrollments } = await supabase
+      .from('course_enrollments')
+      .select('student_id, enrolled_at, users!student_id(id, name, email, role)')
+      .eq('course_id', courseId)
 
-    // Deduplicate by student id
-    const seen = new Set<string>()
-    for (const s of submissions ?? []) {
-      const u = s.users as { id: string; name: string | null; email: string; role: string; created_at: string }
-      if (!seen.has(u.id)) {
-        seen.add(u.id)
-        students.push(u)
+    for (const e of enrollments ?? []) {
+      const u = e.users as { id: string; name: string | null; email: string; role: string } | null
+      if (u) {
+        students.push({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          joinedAt: e.enrolled_at,
+        })
       }
     }
     students.sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email, 'zh-TW'))
   } else {
-    // All students
     const { data } = await supabase
       .from('users')
       .select('id, name, email, role, created_at')
       .eq('role', 'student')
       .order('name')
-    students = data ?? []
+    students = (data ?? []).map(s => ({ ...s, joinedAt: s.created_at }))
   }
 
   const selectedCourse = courses?.find(c => c.id === courseId)
+  const isOwner = navUser.role === 'teacher' && selectedCourse?.teacher_id === userId
   const subtitle = courseId
-    ? `${selectedCourse?.name ?? ''} · ${students.length} 位已繳交學生`
+    ? `${selectedCourse?.name ?? ''} · ${students.length} 位已加入學生`
     : `全部 ${students.length} 位學生`
 
   return (
@@ -103,7 +105,7 @@ export default async function StudentsPage({
 
         {students.length === 0 ? (
           <p className="text-foreground/60">
-            {courseId ? '此課程尚無學生繳交作業。' : '尚無學生資料。'}
+            {courseId ? '此課程尚無已加入的學生。' : '尚無學生資料。'}
           </p>
         ) : (
           <Card>
@@ -114,7 +116,12 @@ export default async function StudentsPage({
                     <th className="text-left py-2 font-medium text-foreground/60">學生</th>
                     <th className="text-left py-2 font-medium text-foreground/60">Email</th>
                     <th className="text-left py-2 font-medium text-foreground/60">身份</th>
-                    <th className="text-left py-2 font-medium text-foreground/60">加入時間</th>
+                    <th className="text-left py-2 font-medium text-foreground/60">
+                      {courseId ? '加入課程時間' : '加入時間'}
+                    </th>
+                    {isOwner && courseId && (
+                      <th className="py-2" />
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -129,8 +136,17 @@ export default async function StudentsPage({
                       <td className="py-2.5 text-foreground/70">{s.email}</td>
                       <td className="py-2.5"><RoleBadge role={s.role} /></td>
                       <td className="py-2.5 text-foreground/50">
-                        {new Date(s.created_at).toLocaleDateString('zh-TW')}
+                        {new Date(s.joinedAt).toLocaleDateString('zh-TW')}
                       </td>
+                      {isOwner && courseId && (
+                        <td className="py-2.5 text-right">
+                          <RemoveStudentButton
+                            courseId={courseId}
+                            studentId={s.id}
+                            studentName={s.name}
+                          />
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

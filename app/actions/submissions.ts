@@ -405,6 +405,34 @@ export async function getAssignmentSubmissionStatus(assignmentId: string): Promi
   })
 }
 
+export async function deleteSubmission(submissionId: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '未登入' }
+
+  const { data: submission } = await supabase
+    .from('submissions')
+    .select('assignment_id, assignments!inner(status, course_id, courses!inner(teacher_id))')
+    .eq('id', submissionId)
+    .single()
+
+  if (!submission) return { error: '繳交資料不存在' }
+
+  const assignment = submission.assignments as unknown as { status: string; course_id: string; courses: { teacher_id: string } }
+  if (assignment.courses.teacher_id !== user.id) return { error: '無權限' }
+  if (assignment.status !== 'open') return { error: '只有開放繳交階段可刪除繳交資料' }
+
+  const { error } = await supabase
+    .from('submissions')
+    .delete()
+    .eq('id', submissionId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/courses/${assignment.course_id}/assignments/${submission.assignment_id}`)
+  return {}
+}
+
 export interface ReviewerProgress {
   reviewerId: string
   name: string | null

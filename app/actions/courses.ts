@@ -117,6 +117,31 @@ export async function getCourse(id: string) {
   return data
 }
 
+export async function unenrollStudent(courseId: string, studentId: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '未登入' }
+
+  const { data: course } = await supabase
+    .from('courses')
+    .select('teacher_id')
+    .eq('id', courseId)
+    .single()
+
+  if (!course || course.teacher_id !== user.id) return { error: '無權限' }
+
+  const { error } = await supabase
+    .from('course_enrollments')
+    .delete()
+    .eq('course_id', courseId)
+    .eq('student_id', studentId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/students')
+  return {}
+}
+
 export async function enrollCourse(formData: FormData): Promise<{ error: string } | undefined> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

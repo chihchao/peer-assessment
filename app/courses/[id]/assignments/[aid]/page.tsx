@@ -189,6 +189,7 @@ export default async function AssignmentDetailPage({
                       rows={submissionRows}
                       courseId={id}
                       assignmentId={aid}
+                      assignmentStatus={assignment.status}
                     />
                   </tbody>
                 </table>

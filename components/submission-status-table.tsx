@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
+import { deleteSubmission } from '@/app/actions/submissions'
 
 export interface SubmissionRow {
   studentId: string
@@ -17,10 +19,15 @@ interface Props {
   rows: SubmissionRow[]
   courseId: string
   assignmentId: string
+  assignmentStatus?: string
 }
 
-export function SubmissionStatusTable({ rows, courseId, assignmentId }: Props) {
+export function SubmissionStatusTable({ rows, courseId, assignmentId, assignmentStatus }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
+  const canDelete = assignmentStatus === 'open'
 
   function toggle(studentId: string) {
     setExpanded(prev => {
@@ -28,6 +35,16 @@ export function SubmissionStatusTable({ rows, courseId, assignmentId }: Props) {
       if (next.has(studentId)) next.delete(studentId)
       else next.add(studentId)
       return next
+    })
+  }
+
+  function handleDelete(submissionId: string, studentName: string | null) {
+    if (!confirm(`確定要刪除「${studentName ?? '此學生'}」的繳交資料？`)) return
+    setDeletingId(submissionId)
+    startTransition(async () => {
+      await deleteSubmission(submissionId)
+      setDeletingId(null)
+      router.refresh()
     })
   }
 
@@ -45,6 +62,7 @@ export function SubmissionStatusTable({ rows, courseId, assignmentId }: Props) {
         const isExpanded = expanded.has(s.studentId)
         const privateFields = (s.fields ?? []).filter(f => f.is_private)
         const publicFields = (s.fields ?? []).filter(f => !f.is_private)
+        const isDeleting = deletingId === s.submissionId && isPending
 
         return (
           <>
@@ -78,6 +96,15 @@ export function SubmissionStatusTable({ rows, courseId, assignmentId }: Props) {
                     >
                       詳情 →
                     </Link>
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDelete(s.submissionId!, s.name)}
+                        disabled={isDeleting}
+                        className="text-xs text-destructive hover:underline disabled:opacity-40"
+                      >
+                        {isDeleting ? '刪除中…' : '刪除'}
+                      </button>
+                    )}
                   </span>
                 )}
               </td>
