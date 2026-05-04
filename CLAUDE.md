@@ -32,6 +32,17 @@ const { userId, navUser } = await requireAuth()
 // navUser: { name, email, role, avatarUrl }
 ```
 
+## Documentation Organization
+
+- Detailed feature docs → `docs/`
+- DB schema reference → `docs/schema.md`
+- RBAC / role access rules → `.claude/skills/rbac/SKILL.md`
+- Sub-module conventions → each directory's own `CLAUDE.md`
+  (`app/`, `components/`, `app/actions/`)
+
+Keep this root file as a lean index. Never write detailed implementation
+notes directly here — find the right sub-doc or create a new one in `docs/`.
+
 ## Documentation Index
 
 | Topic | Location |
