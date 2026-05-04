@@ -66,7 +66,7 @@ Re-exported from `components/layout/index.ts`.
 | AssignmentForm | `assignment-form.tsx` | Client | Dynamic form for creating/editing assignments; manages field & dimension arrays; used by teacher create/edit pages |
 | SubmissionForm | `submission-form.tsx` | Client | Student submission form; textarea fields rendered first, single-line fields second; accepts optional `initialValues` prop for edit/pre-fill mode; "新增欄位" adds a value-only extra field (label auto-generated); submit button shows "更新繳交" when editing |
 | ReviewForm | `review-form.tsx` | Client | Peer review rating form; one numeric input per dimension; enforces scale bounds before submission |
-| SubmissionStatusTable | `submission-status-table.tsx` | Client | Teacher-facing table of student submission status; expand/collapse inline preview (separates private vs public fields); links to `/submissions/[sid]` detail page |
+| SubmissionStatusTable | `submission-status-table.tsx` | Client | Teacher-facing table of student submission status; expand/collapse inline preview (separates private vs public fields); links to `/submissions/[sid]` detail page; accepts `assignmentStatus` prop — shows "刪除" button per submitted row when `assignmentStatus === 'open'` (calls `deleteSubmission` action, refreshes via `useRouter`) |
 | LinkifiedText | `linkified-text.tsx` | Server | Renders plain text with auto-linked URLs (`<a target="_blank">`) using regex; used in submission detail pages |
 
 ### Route-Specific Components
@@ -74,9 +74,10 @@ Re-exported from `components/layout/index.ts`.
 Co-located under their route directories (`app/.../`):
 
 | Component | File | Type | Description |
-|-----------|------|------|-------------|
+| --------- | ---- | ---- | ----------- |
 | JoinCourseForm | `app/courses/_components/join-course-form.tsx` | Client | Input + submit button for student course enrollment via 6-char code; shown on `/courses` for non-teacher roles |
 | CopyCodeButton | `app/courses/[id]/_components/copy-code-button.tsx` | Client | Clipboard copy button with "已複製" feedback; shown on `/courses/[id]` for teachers |
+| RemoveStudentButton | `app/students/_components/remove-student-button.tsx` | Client | Confirm + call `unenrollStudent` action to remove a student from a course; shown on `/students?course=` for the course-owning teacher only |
 
 ### Hooks (`hooks/`)
 
@@ -274,9 +275,9 @@ All tables have RLS enabled. RLS summary:
 |------|---------|
 | `app/actions.ts` | `signOut` |
 | `app/login/actions.ts` | `signInWithGoogle` — triggers Google OAuth redirect |
-| `app/actions/courses.ts` | `createCourse`, `updateCourse`, `deleteCourse`, `getCourses`, `getCourse`, `enrollCourse` (student enrollment via 6-char code; calls `enroll_by_code` RPC) |
+| `app/actions/courses.ts` | `createCourse`, `updateCourse`, `deleteCourse`, `getCourses`, `getCourse`, `enrollCourse` (student enrollment via 6-char code; calls `enroll_by_code` RPC), `unenrollStudent` (teacher removes a student from a course; validates course ownership) |
 | `app/actions/assignments.ts` | `createAssignment`, `updateAssignment`, `deleteAssignment`, `publishAssignment`, `activatePeerReview`, `activateGradeCalculation`, `getAssignment`, `getCourseAssignments` |
-| `app/actions/submissions.ts` | `submitAssignment` (upsert — supports edit; always writes private「基本資料」field at order -1), `submitReview`, `getMySubmission`, `getPendingReviews`, `getReviewDetail`, `getAssignmentDetailedScores`, `getMyReceivedReviews`, `getAssignmentSubmissionStatus`, `getAssignmentPeerReviewStatus` |
+| `app/actions/submissions.ts` | `submitAssignment` (upsert — supports edit; always writes private「基本資料」field at order -1), `submitReview`, `getMySubmission`, `getPendingReviews`, `getReviewDetail`, `getAssignmentDetailedScores`, `getMyReceivedReviews`, `getAssignmentSubmissionStatus`, `getAssignmentPeerReviewStatus`, `deleteSubmission` (teacher deletes a student's submission; only allowed when assignment status is `open`) |
 
 ### API Routes
 
@@ -308,14 +309,14 @@ Fisher-Yates shuffle of submissions, then each student reviews the next `reviewe
 | `/courses/[id]` | `app/courses/[id]/page.tsx` | All | Complete — teacher: edit/delete/add-assignment + course code with `CopyCodeButton` |
 | `/courses/[id]/edit` | `app/courses/[id]/edit/page.tsx` | Teacher | Complete — includes editable code field (6-char alphanumeric validation) |
 | `/courses/[id]/assignments/new` | `app/courses/[id]/assignments/new/page.tsx` | Teacher | Complete |
-| `/courses/[id]/assignments/[aid]` | `app/courses/[id]/assignments/[aid]/page.tsx` | All | Complete — teacher: lifecycle buttons; student: submit (blank fields allowed) or edit submission (pre-filled form, upsert); read-only view when not open |
+| `/courses/[id]/assignments/[aid]` | `app/courses/[id]/assignments/[aid]/page.tsx` | All | Complete — teacher: lifecycle buttons + per-student delete button when status is `open`; student: submit (blank fields allowed) or edit submission (pre-filled form, upsert); read-only view when not open |
 | `/courses/[id]/assignments/[aid]/edit` | `app/courses/[id]/assignments/[aid]/edit/page.tsx` | Teacher | Complete — blocked if status ≠ draft |
 | `/courses/[id]/assignments/[aid]/submissions/[sid]` | `app/courses/[id]/assignments/[aid]/submissions/[sid]/page.tsx` | Teacher (owner) | Complete — full submission detail; separates private (教師專屬) and public fields; uses `LinkifiedText` for URL auto-linking |
 | `/assignments` | `app/assignments/page.tsx` | Teacher, TA | Complete — lists open assignments (removed from student navbar) |
 | `/peer-review` | `app/peer-review/page.tsx` | Student | Complete — pending review list |
 | `/peer-review/[rid]` | `app/peer-review/[rid]/page.tsx` | Student | Complete — side-by-side submission view + rating form |
 | `/grades` | `app/grades/page.tsx` | All | Complete — student: own grades; teacher/TA: full table |
-| `/students` | `app/students/page.tsx` | Teacher, TA | Complete — student list with avatar + role badge |
+| `/students` | `app/students/page.tsx` | Teacher, TA | Complete — student list with avatar + role badge; course tab queries `course_enrollments` (shows `enrolled_at`); course-owning teacher sees "移除" button per student via `RemoveStudentButton` |
 
 ### Loading & Error Boundaries
 
@@ -326,7 +327,7 @@ Fisher-Yates shuffle of submissions, then each student reviews the next `reviewe
 
 Core academic workflow is complete. Potential future enhancements:
 
-- **Enrollment-gated visibility**: filter courses/assignments so students only see content for courses they enrolled in (schema is in place; display logic not yet scoped)
+- **Enrollment-gated visibility**: filter courses/assignments so students only see content for courses they enrolled in (schema and teacher-side enrollment management are in place; student-side display logic not yet scoped)
 - **Notifications**: alert students when peer review is activated or grades are published
 - **TA write access**: allow TA to manage stuck workflows (currently read-only)
 - **Assignment excusal**: teacher ability to mark a student as excused before activating peer review
